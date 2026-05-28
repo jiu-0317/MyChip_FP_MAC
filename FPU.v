@@ -33,10 +33,9 @@ wire [2:0] mant_input   = i_input  [2:0];
 // ~|exp_weight — exponent 전체가 0이면 true (zero 또는 subnormal)
 // 양쪽 입력 중 하나라도 해당되면 특수값
 
-wire is_nan_or_inf = (&exp_weight) | (&exp_input);
-wire is_zero = (~|exp_weight) & (~|mant_weight) | (~|exp_input) & (~|mant_input);
+//wire is_nan_or_inf = (&exp_weight) | (&exp_input);
+//wire is_zero = (~|exp_weight) & (~|mant_weight) | (~|exp_input) & (~|mant_input);
 
-/* 특수값 처리 변경 전 코드
 // inf
 wire weight_is_inf  = (exp_weight==5'b11111) & (mant_weight==3'b000);
 wire input_is_inf   = (exp_input ==5'b11111) & (mant_input ==3'b000);
@@ -46,7 +45,7 @@ wire input_is_zero  = (exp_input ==5'b00000) & (mant_input ==3'b000);
 //nan
 wire weight_is_nan  = (exp_weight==5'b11111) & (mant_weight!=3'b000);
 wire input_is_nan   = (exp_input ==5'b11111) & (mant_input !=3'b000);
-*/
+
 
 
 // 3. Exponent 덧셈
@@ -90,12 +89,13 @@ wire overflow  = (exp_final >  7'sd30);
 wire underflow = (exp_final <= 7'sd0 );
 
 // 9. 출력 값 정의 
-// wire [8:0] inf_val    = {sign_out, 5'b11111, 3'b000};
+wire [8:0] inf_val    = {sign_out, 5'b11111, 3'b000};
 wire [8:0] zero_val   = {sign_out, 5'b00000, 3'b000};
 wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
 
 // 10. 출력
+/*
 always @(*) begin
     if (i_start) begin
         if (is_nan_or_inf || overflow)
@@ -107,9 +107,8 @@ always @(*) begin
     end else begin
         o_result = 9'd0;
     end
-end
+end */
 
-/*
 always @(*) begin
     if (i_start) begin
         if (weight_is_nan || input_is_nan) begin
@@ -131,5 +130,5 @@ always @(*) begin
         o_result = 9'd0;
     end
 end
- */
+ 
 endmodule
