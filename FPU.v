@@ -96,13 +96,18 @@ wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
 
 // 10. 출력
-
-if (is_nan_or_inf || overflow)
-    o_result = nan_val;
-else if (is_zero || underflow)
-    o_result = zero_val;
-else
-    o_result = normal_val;
+always @(*) begin
+    if (i_start) begin
+        if (is_nan_or_inf || overflow)
+            o_result = nan_val;
+        else if (is_zero || underflow)
+            o_result = zero_val;
+        else
+            o_result = normal_val;
+    end else begin
+        o_result = 9'd0;
+    end
+end
 
 /*
 always @(*) begin
