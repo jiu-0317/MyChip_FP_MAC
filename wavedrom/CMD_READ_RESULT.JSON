@@ -1,0 +1,9 @@
+{signal: [
+  {name: 'clk', wave: 'p..|.....'},
+  {name: 'ACC(o_done)', wave: '010|.....'},
+  {name: 'CONTROL(acc_done_flag)', wave: '0.1|.....'},
+  {name: 'IR(o_cmd_valid_one_pulse)', wave: '0..|10...'},
+    {name: 'ACC_R(i_wen)', wave: '0..|.10..'},
+  {name: 'ACC_R(o_valid)', wave: '0..|..1..'},
+  {name: 'SPI_slave(i_tx_load)', wave: '0..|..10.'},
+]}

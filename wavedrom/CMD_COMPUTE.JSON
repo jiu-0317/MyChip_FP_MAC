@@ -1,0 +1,9 @@
+{ signal: [
+  { name: "clk",         wave: "p..........." },
+  { name: "W_I_RF(o_w_all_valid)",     wave: "1.|........." },
+  { name: "W_I_RF(o_i_all_valid)",     wave: "01|........." },
+  { name: "IR(o_cmd_valid_one_pulse)",     wave: "0.|10......." },
+  { name: "FPU(i_start)",     wave: "0.|.10......" },
+  { name: "FPU_RF(i_wen)",     wave: "0.|..10....." },
+  { name: "FPU_RF(o_all_valid)",     wave: "0.....1....." },
+]}

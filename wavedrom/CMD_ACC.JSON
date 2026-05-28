@@ -1,0 +1,12 @@
+{signal: [
+  {name: 'clk', wave: 'p...................'},
+  {name: 'FPU_RF(o_all_valid)', wave: '0.1|................'},
+  { name: "IR(o_cmd_valid_one_pulse)",     wave: "0..|10.............." },
+  {name: 'FPU_RF(i_send_start)', wave: '0..|.10.............'},
+  {name: 'FPU_RF(sending)', wave: '0..|..1.............'},
+  {name: 'ACC(i_start)', wave: '0..|.10.............'},
+  {name: 'ACC(active)', wave: '0..|..1.............'},
+  {name: 'FPU_RF(o_data)', wave: '0..|....57575|0.....'},
+  {name: 'ACC(o_data)', wave: '0..|.....93939|0....'},
+  {name: 'ACC(o_done)', wave: '0..|............10..'}
+]}

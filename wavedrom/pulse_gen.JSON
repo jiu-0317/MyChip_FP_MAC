@@ -1,0 +1,7 @@
+{ signal: [
+  { name: "clk",         wave: "p.........." },
+  { name: "pulse",        wave: "010........." },
+  { name: "~d_pulse",        wave: "1.01........" },
+  { name: "output",        wave: "0.10........" },
+]}
+
