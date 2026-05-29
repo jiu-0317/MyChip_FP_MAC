@@ -57,6 +57,8 @@ always @(posedge i_clk or negedge i_rstn) begin
     else if (state == S_TX_RESULT)
         acc_done_flag <= 1'b0;
 end
+
+
 //--------------------
 reg fpu_rf_done_flag;
 
