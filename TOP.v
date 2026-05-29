@@ -28,8 +28,8 @@ wire        ctrl_tx_load;
 // wire        ctrl_clear_valid;
 wire        ctrl_w_wen;
 wire        ctrl_i_wen;
-wire        ctrl_fpu_start;
-wire        ctrl_fpu_rf_wen;
+//wire        ctrl_fpu_start;
+//wire        ctrl_fpu_rf_wen;
 wire        ctrl_fpu_rf_send_start;
 wire        ctrl_acc_start;
 wire        ctrl_acc_r_wen;
@@ -45,8 +45,9 @@ wire [8:0]  i_data_rf [8:0];
 wire [8:0]  fpu_result [8:0];
 
 // FPU_RF
-wire [8:0]  fpu_rf_out;
-wire        fpu_rf_all_valid;
+// 변경
+wire [8:0]  router_out;
+//wire        fpu_rf_all_valid;
 
 // ACC
 wire [8:0]  acc_result;
@@ -104,10 +105,10 @@ CONTROL u_ctrl (
     .o_i_wen              (ctrl_i_wen),
     //.i_w_all_valid        (w_all_valid),
     //.i_i_all_valid        (i_all_valid),
-    .o_fpu_start          (ctrl_fpu_start),
-    .o_fpu_rf_wen         (ctrl_fpu_rf_wen),
+    //.o_fpu_start          (ctrl_fpu_start),
+    //.o_fpu_rf_wen         (ctrl_fpu_rf_wen),
     .o_fpu_rf_send_start  (ctrl_fpu_rf_send_start),
-    .i_fpu_rf_all_valid   (fpu_rf_all_valid),
+    //.i_fpu_rf_all_valid   (fpu_rf_all_valid),
     .o_acc_start          (ctrl_acc_start),
     .i_acc_done           (acc_done),
     .o_acc_r_wen          (ctrl_acc_r_wen),
@@ -134,7 +135,7 @@ genvar g;
 generate
     for (g = 0; g < 9; g = g + 1) begin : fpu_gen
         FPU u_fpu (
-            .i_start  (ctrl_fpu_start),
+            //.i_start  (ctrl_fpu_start),
             .i_weight (w_data[g]),
             .i_input  (i_data_rf[g]),
             .o_result (fpu_result[g])
@@ -143,7 +144,7 @@ generate
 endgenerate
 
 // ===== FPU_RF =====
-FPU_RF u_fpu_rf (
+/*FPU_RF u_fpu_rf (
     .i_clk       (i_clk),
     .i_rstn      (i_rstn),
     .i_wen       (ctrl_fpu_rf_wen),
@@ -151,6 +152,15 @@ FPU_RF u_fpu_rf (
     .i_data      (fpu_result),
     .o_data      (fpu_rf_out),
     .o_all_valid (fpu_rf_all_valid)
+);*/
+
+// 변경
+FPU_router u_router (
+    .i_clk       (i_clk),
+    .i_rstn      (i_rstn),
+    .i_send_start(ctrl_fpu_rf_send_start),
+    .i_data      (fpu_result),
+    .o_data      (router_out)
 );
 
 // ===== ACC =====
@@ -158,7 +168,7 @@ ACC u_acc (
     .i_clk    (i_clk),
     .i_rstn   (i_rstn),
     .i_start  (ctrl_acc_start),
-    .i_data   (fpu_rf_out),
+    .i_data   (router_out),
     .o_result (acc_result),
     .o_done   (acc_done)
 );

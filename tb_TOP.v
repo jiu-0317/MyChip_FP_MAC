@@ -198,11 +198,11 @@ initial begin
     #500;
 
     // Check FPU results & FPU_RF
-    $display("[%0t] fpu_rf_all_valid=%b, CONTROL state=%b",
+// 변경
+    $display("[%0t] CONTROL state=%b",
         $time,
-        u_top.fpu_rf_all_valid,
         u_top.u_ctrl.state);
-
+        
     // ----- ACC (cmd=011) -----
     $display("\n========== ACC ==========");
     spi_cmd(3'b011, 8'h00, 4'h0, 1'b0);
