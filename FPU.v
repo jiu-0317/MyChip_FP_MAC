@@ -10,7 +10,7 @@
 `timescale 1ns / 1ps
 
 module FPU (
-    input            i_start,
+    // input            i_start,
     input  [8:0]     i_weight,
     input  [8:0]     i_input,
     output reg [8:0] o_result
@@ -110,7 +110,6 @@ always @(*) begin
 end */
 
 always @(*) begin
-    if (i_start) begin
         if (weight_is_nan || input_is_nan) begin
             o_result = nan_val;
         end else if ((weight_is_inf && input_is_zero) || (weight_is_zero && input_is_inf)) begin
@@ -126,9 +125,6 @@ always @(*) begin
         end else begin
           o_result = normal_val;
         end
-    end else begin
-        o_result = 9'd0;
     end
-end
  
 endmodule

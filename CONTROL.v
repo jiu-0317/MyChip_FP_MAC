@@ -16,11 +16,8 @@ module CONTROL (
     // input i_w_all_valid,
     // input i_i_all_valid,
     // FPU (FPU 9개)
-    output reg o_fpu_start,
     // FPU_RF
-    output reg o_fpu_rf_wen,
     output reg o_fpu_rf_send_start,
-    input i_fpu_rf_all_valid,
     // ACC
     output reg o_acc_start,
     input i_acc_done,
@@ -32,11 +29,11 @@ module CONTROL (
 localparam S_IDLE          = 3'b000;
 localparam S_LOAD_W        = 3'b001;
 localparam S_LOAD_I        = 3'b010;
-localparam S_COMPUTE_START = 3'b011;
-localparam S_COMPUTE_DONE  = 3'b100;
-localparam S_ACC_START     = 3'b101;
-localparam S_READ_RESULT   = 3'b110;
-localparam S_TX_RESULT     = 3'b111;
+localparam S_COMPUTE = 3'b011;
+//localparam S_COMPUTE_DONE  = 3'b100;
+localparam S_ACC_START     = 3'b100;
+localparam S_READ_RESULT   = 3'b101;
+localparam S_TX_RESULT     = 3'b110;
 
 localparam CMD_LOAD_W      = 3'b000;
 localparam CMD_LOAD_I      = 3'b001;
@@ -60,6 +57,7 @@ end
 
 
 //--------------------
+/*
 reg fpu_rf_done_flag;
 
 always @(posedge i_clk or negedge i_rstn) begin
@@ -70,6 +68,7 @@ always @(posedge i_clk or negedge i_rstn) begin
     else if (state == S_ACC_START)
         fpu_rf_done_flag <= 1'b0;
 end
+*/
 //--------------------
 
 // --- state 넘기기 ---
@@ -91,16 +90,16 @@ always @(*) begin
                 next_state = S_LOAD_I;
             // if ((i_cmd==CMD_COMPUTE) && i_cmd_valid_one_pulse && i_w_all_valid && i_i_all_valid)
             if ((i_cmd==CMD_COMPUTE) && i_cmd_valid_one_pulse)
-                next_state = S_COMPUTE_START;
-            if ((i_cmd==CMD_ACC) && i_cmd_valid_one_pulse && fpu_rf_done_flag)
+                next_state = S_COMPUTE;
+            if ((i_cmd==CMD_ACC) && i_cmd_valid_one_pulse)
                 next_state = S_ACC_START;
             if ((i_cmd==CMD_READ_RESULT) && i_cmd_valid_one_pulse && acc_done_flag)
                 next_state = S_READ_RESULT;
         end 
         S_LOAD_W:        next_state = S_IDLE;
         S_LOAD_I:        next_state = S_IDLE;
-        S_COMPUTE_START: next_state = S_COMPUTE_DONE;
-        S_COMPUTE_DONE:  next_state = S_IDLE;
+        S_COMPUTE: next_state = S_IDLE;
+        //S_COMPUTE_DONE:  next_state = S_IDLE;
         S_ACC_START:     next_state = S_IDLE;
         S_READ_RESULT: next_state = S_TX_RESULT;
         S_TX_RESULT: next_state = S_IDLE;
@@ -115,8 +114,8 @@ always @(posedge i_clk or negedge i_rstn) begin
         // o_clear_valid       <= 1'b0;
         o_w_wen             <= 1'b0;
         o_i_wen             <= 1'b0;
-        o_fpu_start         <= 1'b0;
-        o_fpu_rf_wen        <= 1'b0;
+        //o_fpu_start         <= 1'b0;
+        //o_fpu_rf_wen        <= 1'b0;
         o_fpu_rf_send_start <= 1'b0;
         o_acc_start         <= 1'b0;
         o_acc_r_wen         <= 1'b0;
@@ -126,8 +125,8 @@ always @(posedge i_clk or negedge i_rstn) begin
         // o_clear_valid       <= 1'b0;
         o_w_wen             <= 1'b0;
         o_i_wen             <= 1'b0;
-        o_fpu_start         <= 1'b0;
-        o_fpu_rf_wen        <= 1'b0;
+        //o_fpu_start         <= 1'b0;
+        //o_fpu_rf_wen        <= 1'b0;
         o_fpu_rf_send_start <= 1'b0;
         o_acc_start         <= 1'b0;
         o_acc_r_wen         <= 1'b0; 
@@ -135,12 +134,7 @@ always @(posedge i_clk or negedge i_rstn) begin
             S_IDLE: ;
             S_LOAD_W: o_w_wen <= 1'b1;
             S_LOAD_I: o_i_wen <= 1'b1;
-            S_COMPUTE_START: o_fpu_start <= 1'b1;
-            S_COMPUTE_DONE: begin
-                o_fpu_rf_wen <= 1'b1;
-                o_fpu_start <= 1'b1; 
-                // FPU가 계속 돌고 있어야 valid한 값 나오는 중에 RF에 저장 가능
-            end
+            S_COMPUTE: ;
             S_ACC_START: begin
                 o_fpu_rf_send_start <= 1'b1;
                 o_acc_start <= 1'b1;
