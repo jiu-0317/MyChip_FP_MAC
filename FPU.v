@@ -54,7 +54,14 @@ wire signed [6:0] exp_added = $signed({2'd0, exp_weight}) + $signed({2'd0, exp_i
 
 // 4. Mantissa 곱셈
 // leading 1 붙여서 연산, 4bit x 4bit = 8bit
-wire [7:0] mant_product = {1'b1, mant_weight} * {1'b1, mant_input};
+//wire [7:0] mant_product = {1'b1, mant_weight} * {1'b1, mant_input};
+wire [7:0] mant_product;
+
+mant_mult_lut u_mant_lut (
+    .mant_a  (mant_weight),
+    .mant_b  (mant_input),
+    .product (mant_product)
+);
 
 // 5. 정규화
 // 1X.XXXXXX --> exp+1, mant 유지
