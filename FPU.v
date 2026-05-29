@@ -52,43 +52,88 @@ wire input_is_nan   = (exp_input ==5'b11111) & (mant_input !=3'b000);
 // 5bit+5bit = 6bit --> signed로 표현 위해 7bit
 wire signed [6:0] exp_added = $signed({2'd0, exp_weight}) + $signed({2'd0, exp_input}) - 7'sd15;
 
-// 4. Mantissa 곱셈
-// leading 1 붙여서 연산, 4bit x 4bit = 8bit
-//wire [7:0] mant_product = {1'b1, mant_weight} * {1'b1, mant_input};
-wire [7:0] mant_product;
+reg [2:0] mant_final;
+reg       exp_adj;
 
-mant_mult_lut u_mant_lut (
-    .mant_a  (mant_weight),
-    .mant_b  (mant_input),
-    .product (mant_product)
-);
+always @(*) begin
+    case ({mant_weight, mant_input})
+        // mant_w=000
+        6'b000_000: {exp_adj, mant_final} = 4'b0_000;
+        6'b000_001: {exp_adj, mant_final} = 4'b0_001;
+        6'b000_010: {exp_adj, mant_final} = 4'b0_010;
+        6'b000_011: {exp_adj, mant_final} = 4'b0_011;
+        6'b000_100: {exp_adj, mant_final} = 4'b0_100;
+        6'b000_101: {exp_adj, mant_final} = 4'b0_101;
+        6'b000_110: {exp_adj, mant_final} = 4'b0_110;
+        6'b000_111: {exp_adj, mant_final} = 4'b0_111;
+        // mant_w=001
+        6'b001_000: {exp_adj, mant_final} = 4'b0_001;
+        6'b001_001: {exp_adj, mant_final} = 4'b0_010;
+        6'b001_010: {exp_adj, mant_final} = 4'b0_011;
+        6'b001_011: {exp_adj, mant_final} = 4'b0_100;
+        6'b001_100: {exp_adj, mant_final} = 4'b0_110;
+        6'b001_101: {exp_adj, mant_final} = 4'b0_111;
+        6'b001_110: {exp_adj, mant_final} = 4'b1_000;
+        6'b001_111: {exp_adj, mant_final} = 4'b1_000;
+        // mant_w=010
+        6'b010_000: {exp_adj, mant_final} = 4'b0_010;
+        6'b010_001: {exp_adj, mant_final} = 4'b0_011;
+        6'b010_010: {exp_adj, mant_final} = 4'b0_100;
+        6'b010_011: {exp_adj, mant_final} = 4'b0_110;
+        6'b010_100: {exp_adj, mant_final} = 4'b0_111;
+        6'b010_101: {exp_adj, mant_final} = 4'b1_000;
+        6'b010_110: {exp_adj, mant_final} = 4'b1_001;
+        6'b010_111: {exp_adj, mant_final} = 4'b1_001;
+        // mant_w=011
+        6'b011_000: {exp_adj, mant_final} = 4'b0_011;
+        6'b011_001: {exp_adj, mant_final} = 4'b0_100;
+        6'b011_010: {exp_adj, mant_final} = 4'b0_110;
+        6'b011_011: {exp_adj, mant_final} = 4'b0_111;
+        6'b011_100: {exp_adj, mant_final} = 4'b1_000;
+        6'b011_101: {exp_adj, mant_final} = 4'b1_001;
+        6'b011_110: {exp_adj, mant_final} = 4'b1_010;
+        6'b011_111: {exp_adj, mant_final} = 4'b1_010;
+        // mant_w=100
+        6'b100_000: {exp_adj, mant_final} = 4'b0_100;
+        6'b100_001: {exp_adj, mant_final} = 4'b0_110;
+        6'b100_010: {exp_adj, mant_final} = 4'b0_111;
+        6'b100_011: {exp_adj, mant_final} = 4'b1_000;
+        6'b100_100: {exp_adj, mant_final} = 4'b1_001;
+        6'b100_101: {exp_adj, mant_final} = 4'b1_010;
+        6'b100_110: {exp_adj, mant_final} = 4'b1_010;
+        6'b100_111: {exp_adj, mant_final} = 4'b1_011;
+        // mant_w=101
+        6'b101_000: {exp_adj, mant_final} = 4'b0_101;
+        6'b101_001: {exp_adj, mant_final} = 4'b0_111;
+        6'b101_010: {exp_adj, mant_final} = 4'b1_000;
+        6'b101_011: {exp_adj, mant_final} = 4'b1_001;
+        6'b101_100: {exp_adj, mant_final} = 4'b1_010;
+        6'b101_101: {exp_adj, mant_final} = 4'b1_011;
+        6'b101_110: {exp_adj, mant_final} = 4'b1_011;
+        6'b101_111: {exp_adj, mant_final} = 4'b1_100;
+        // mant_w=110
+        6'b110_000: {exp_adj, mant_final} = 4'b0_110;
+        6'b110_001: {exp_adj, mant_final} = 4'b1_000;
+        6'b110_010: {exp_adj, mant_final} = 4'b1_001;
+        6'b110_011: {exp_adj, mant_final} = 4'b1_010;
+        6'b110_100: {exp_adj, mant_final} = 4'b1_010;
+        6'b110_101: {exp_adj, mant_final} = 4'b1_011;
+        6'b110_110: {exp_adj, mant_final} = 4'b1_100;
+        6'b110_111: {exp_adj, mant_final} = 4'b1_101;
+        // mant_w=111
+        6'b111_000: {exp_adj, mant_final} = 4'b0_111;
+        6'b111_001: {exp_adj, mant_final} = 4'b1_000;
+        6'b111_010: {exp_adj, mant_final} = 4'b1_001;
+        6'b111_011: {exp_adj, mant_final} = 4'b1_010;
+        6'b111_100: {exp_adj, mant_final} = 4'b1_011;
+        6'b111_101: {exp_adj, mant_final} = 4'b1_100;
+        6'b111_110: {exp_adj, mant_final} = 4'b1_101;
+        6'b111_111: {exp_adj, mant_final} = 4'b1_110;
+        default:    {exp_adj, mant_final} = 4'b0_000;
+    endcase
+end
 
-// 5. 정규화
-// 1X.XXXXXX --> exp+1, mant 유지
-// 01.XXXXXX --> exp 유지, mant left shift
-wire signed [6:0] exp_normalized = mant_product[7] ? (exp_added+7'sd1) : exp_added;
-wire [7:0] mant_normalized = mant_product[7] ? mant_product : (mant_product<<1);
-
-// 6. Rounding
-// normalized: 1.(XXX)(X)   (X)   (XX)
-//                    guard round sticky
-//rounding 결과: 1.XXXX --> rounding overflow 가능성 있어서 MSB에 1bit 추가
-wire [2:0] mant_round_candidate = mant_normalized [6:4];
-wire guard  = mant_normalized [3];
-wire round  = mant_normalized [2];
-wire sticky = |mant_normalized [1:0];
-
-wire round_up = guard & (round | sticky | mant_round_candidate[0]);
-// mant_rounded는 leading 1 포함 X, only mantissa
-wire [3:0] mant_rounded = {1'b0, mant_round_candidate} + {3'b0, round_up};
-
-// 7. Rounding overflow 처리 (정규화)
-// 만약 rounding에서 overflow: 1.1000 꼴. 이건 10.000과 동일, 1.000으로 정규화 
-// (mant 0으로, exp+1)
-// --> rounding할 때 1이 넘어갔다는거니까.
-wire round_overflow = mant_rounded [3];
-wire [2:0] mant_final = round_overflow ? 3'b000 : mant_rounded [2:0];
-wire signed [6:0] exp_final  = round_overflow ? (exp_normalized + 7'sd1) : exp_normalized;
+wire signed [6:0] exp_final = exp_added + {6'd0, exp_adj};
 
 // 8. overflow/underflow 처리 (exp)
 // E5M3에서 max normal: S.11110.111 --> exp는 최대 30.
