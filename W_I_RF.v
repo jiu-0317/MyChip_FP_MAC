@@ -39,9 +39,7 @@ always @(i_clk) begin
         w_all_set     <= 9'd0;
         i_all_set     <= 9'd0;
     end else */
-    if (i_clear_valid) begin
-        // i_all_set <= 9'd0;
-    end else if (i_w_wen) begin
+    if (i_w_wen) begin
         case (i_addr)
             4'b0000: begin 
                 o_w_data  [0] <= i_data;

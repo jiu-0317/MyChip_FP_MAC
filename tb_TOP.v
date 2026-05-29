@@ -176,12 +176,6 @@ initial begin
         spi_cmd(3'b000, W[i], i[3:0], WM[i]);
     end
 
-    // Check w_all_valid
-    #100;
-    $display("[%0t] w_all_valid=%b, i_all_valid=%b",
-        $time,
-        u_top.w_all_valid,
-        u_top.i_all_valid);
 
     // ----- LOAD_I x9 (cmd=001) -----
     $display("\n========== LOAD INPUT x9 ==========");
