@@ -190,11 +190,13 @@ initial begin
     end
 
     // Check i_all_valid
+    /*
     #100;
     $display("[%0t] w_all_valid=%b, i_all_valid=%b",
         $time,
         u_top.w_all_valid,
         u_top.i_all_valid);
+        */
 
     // ----- COMPUTE (cmd=010) -----
     $display("\n========== COMPUTE ==========");

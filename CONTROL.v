@@ -10,11 +10,11 @@ module CONTROL (
     input i_cmd_valid_one_pulse,
     input i_mode,
     // W_I_RF
-    output reg o_clear_valid,
+    // output reg o_clear_valid,
     output reg o_w_wen,
     output reg o_i_wen,
-    input i_w_all_valid,
-    input i_i_all_valid,
+    // input i_w_all_valid,
+    // input i_i_all_valid,
     // FPU (FPU 9개)
     output reg o_fpu_start,
     // FPU_RF
@@ -87,7 +87,8 @@ always @(*) begin
                 next_state = S_LOAD_W;
             if ((i_cmd==CMD_LOAD_I) && i_cmd_valid_one_pulse)
                 next_state = S_LOAD_I;
-            if ((i_cmd==CMD_COMPUTE) && i_cmd_valid_one_pulse && i_w_all_valid && i_i_all_valid)
+            // if ((i_cmd==CMD_COMPUTE) && i_cmd_valid_one_pulse && i_w_all_valid && i_i_all_valid)
+            if ((i_cmd==CMD_COMPUTE) && i_cmd_valid_one_pulse)
                 next_state = S_COMPUTE_START;
             if ((i_cmd==CMD_ACC) && i_cmd_valid_one_pulse && fpu_rf_done_flag)
                 next_state = S_ACC_START;
@@ -109,7 +110,7 @@ end
 always @(posedge i_clk or negedge i_rstn) begin
     if (!i_rstn) begin
         o_tx_load           <= 1'b0;
-        o_clear_valid       <= 1'b0;
+        // o_clear_valid       <= 1'b0;
         o_w_wen             <= 1'b0;
         o_i_wen             <= 1'b0;
         o_fpu_start         <= 1'b0;
@@ -120,7 +121,7 @@ always @(posedge i_clk or negedge i_rstn) begin
         o_mode              <= 1'b0;
     end else begin
         o_tx_load           <= 1'b0;
-        o_clear_valid       <= 1'b0;
+        // o_clear_valid       <= 1'b0;
         o_w_wen             <= 1'b0;
         o_i_wen             <= 1'b0;
         o_fpu_start         <= 1'b0;
@@ -148,7 +149,7 @@ always @(posedge i_clk or negedge i_rstn) begin
             end
             S_TX_RESULT: begin
                 o_tx_load <= 1'b1;
-                o_clear_valid <= 1'b1;
+                // o_clear_valid <= 1'b1;
             end
             default: ;
         endcase

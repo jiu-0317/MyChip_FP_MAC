@@ -25,7 +25,7 @@ wire [3:0]  ir_addr;
 
 // CONTROL
 wire        ctrl_tx_load;
-wire        ctrl_clear_valid;
+// wire        ctrl_clear_valid;
 wire        ctrl_w_wen;
 wire        ctrl_i_wen;
 wire        ctrl_fpu_start;
@@ -36,8 +36,8 @@ wire        ctrl_acc_r_wen;
 wire        ctrl_mode;
 
 // W_I_RF
-wire        w_all_valid;
-wire        i_all_valid;
+// wire        w_all_valid;
+// wire        i_all_valid;
 wire [8:0]  w_data   [8:0];
 wire [8:0]  i_data_rf [8:0];
 
@@ -99,11 +99,11 @@ CONTROL u_ctrl (
     .i_cmd                (ir_cmd),
     .i_cmd_valid_one_pulse(ir_cmd_valid_one_pulse),
     .i_mode               (ir_mode),
-    .o_clear_valid        (ctrl_clear_valid),
+    //.o_clear_valid        (ctrl_clear_valid),
     .o_w_wen              (ctrl_w_wen),
     .o_i_wen              (ctrl_i_wen),
-    .i_w_all_valid        (w_all_valid),
-    .i_i_all_valid        (i_all_valid),
+    //.i_w_all_valid        (w_all_valid),
+    //.i_i_all_valid        (i_all_valid),
     .o_fpu_start          (ctrl_fpu_start),
     .o_fpu_rf_wen         (ctrl_fpu_rf_wen),
     .o_fpu_rf_send_start  (ctrl_fpu_rf_send_start),
@@ -118,13 +118,13 @@ CONTROL u_ctrl (
 W_I_RF u_w_i_rf (
     .i_clk        (i_clk),
     .i_rstn       (i_rstn),
-    .i_clear_valid(ctrl_clear_valid),
+    //.i_clear_valid(ctrl_clear_valid),
     .i_w_wen      (ctrl_w_wen),
     .i_i_wen      (ctrl_i_wen),
     .i_addr       (ir_addr),
     .i_data       (ir_data),
-    .o_w_all_valid(w_all_valid),
-    .o_i_all_valid(i_all_valid),
+    //.o_w_all_valid(w_all_valid),
+    //.o_i_all_valid(i_all_valid),
     .o_w_data     (w_data),
     .o_i_data     (i_data_rf)
 );
