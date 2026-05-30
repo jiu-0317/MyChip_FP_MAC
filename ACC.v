@@ -18,7 +18,7 @@ module ACC (
     input            i_clk,
     input            i_rstn,
     input            i_start,
-    input      [8:0] i_data,
+    input      [8:0] i_data[8:0],
     output reg [8:0] o_result,
     output reg       o_done
 );
@@ -34,7 +34,7 @@ wire [8:0] adder_result;
 
 ACC_adder u_adder (
     .i_a     (acc_reg),
-    .i_b     (i_data),
+    .i_b     (i_data[acc_cnt]),
     .o_result(adder_result)
 );
 
@@ -54,21 +54,16 @@ always @(posedge i_clk or negedge i_rstn) begin
         acc_reg  <= 9'd0;
         o_done   <= 1'b0;
     end else if (active) begin
-        if (wait_cnt < 4'd2) begin
-            // 2사이클 대기
-            wait_cnt <= wait_cnt + 4'd1;
-        end else begin
-            // 누적 연산
-            acc_reg <= adder_result;
-            acc_cnt <= acc_cnt + 4'd1;
+        // 누적 연산
+        acc_reg <= adder_result;
+        acc_cnt <= acc_cnt + 4'd1;
 
-            if (acc_cnt == 4'd8) begin
-                // 9개 누적 완료
-                o_result <= adder_result;
-                o_done   <= 1'b1;
-                active   <= 1'b0;
+        if (acc_cnt == 4'd8) begin
+            // 9개 누적 완료
+            o_result <= adder_result;
+            o_done   <= 1'b1;
+            active   <= 1'b0;
             end
-        end
     end else begin
         o_done <= 1'b0;
     end
