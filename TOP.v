@@ -155,20 +155,12 @@ endgenerate
 );*/
 
 // 변경
-FPU_router u_router (
-    .i_clk       (i_clk),
-    .i_rstn      (i_rstn),
-    .i_send_start(ctrl_fpu_rf_send_start),
-    .i_data      (fpu_result),
-    .o_data      (router_out)
-);
-
 // ===== ACC =====
 ACC u_acc (
     .i_clk    (i_clk),
     .i_rstn   (i_rstn),
     .i_start  (ctrl_acc_start),
-    .i_data   (router_out),
+    .i_data   (fpu_result),
     .o_result (acc_result),
     .o_done   (acc_done)
 );
