@@ -49,59 +49,33 @@ wire input_is_nan   = (exp_input ==5'b11111) & (mant_input !=3'b000);
 
 
 // 3. Exponent 덧셈
-// 5bit+5bit = 6bit --> signed로 표현 위해 7bit
 wire signed [6:0] exp_added = $signed({2'd0, exp_weight}) + $signed({2'd0, exp_input}) - 7'sd15;
 
-// 4. Mantissa 곱셈
-// leading 1 붙여서 연산, 4bit x 4bit = 8bit
-//wire [7:0] mant_product = {1'b1, mant_weight} * {1'b1, mant_input};
-wire [7:0] mant_product;
+// 4. Mantissa LUT (곱셈 + 정규화 + 라운딩 + 오버플로우 처리 통합)
+wire [2:0] mant_final;
+wire       exp_delta;
 
 mant_mult_lut u_mant_lut (
-    .mant_a  (mant_weight),
-    .mant_b  (mant_input),
-    .product (mant_product)
+    .mant_a     (mant_weight),
+    .mant_b     (mant_input),
+    .mant_final (mant_final),
+    .exp_delta  (exp_delta)
 );
 
-// 5. 정규화
-// 1X.XXXXXX --> exp+1, mant 유지
-// 01.XXXXXX --> exp 유지, mant left shift
-wire signed [6:0] exp_normalized = mant_product[7] ? (exp_added+7'sd1) : exp_added;
-wire [7:0] mant_normalized = mant_product[7] ? mant_product : (mant_product<<1);
+// 5. Exponent 최종 계산
+wire signed [6:0] exp_final = exp_added + (exp_delta ? 7'sd1 : 7'sd0);
 
-// 6. Rounding
-// normalized: 1.(XXX)(X)   (X)   (XX)
-//                    guard round sticky
-//rounding 결과: 1.XXXX --> rounding overflow 가능성 있어서 MSB에 1bit 추가
-wire [2:0] mant_round_candidate = mant_normalized [6:4];
-wire guard  = mant_normalized [3];
-wire round  = mant_normalized [2];
-wire sticky = |mant_normalized [1:0];
-
-wire round_up = guard & (round | sticky | mant_round_candidate[0]);
-// mant_rounded는 leading 1 포함 X, only mantissa
-wire [3:0] mant_rounded = {1'b0, mant_round_candidate} + {3'b0, round_up};
-
-// 7. Rounding overflow 처리 (정규화)
-// 만약 rounding에서 overflow: 1.1000 꼴. 이건 10.000과 동일, 1.000으로 정규화 
-// (mant 0으로, exp+1)
-// --> rounding할 때 1이 넘어갔다는거니까.
-wire round_overflow = mant_rounded [3];
-wire [2:0] mant_final = round_overflow ? 3'b000 : mant_rounded [2:0];
-wire signed [6:0] exp_final  = round_overflow ? (exp_normalized + 7'sd1) : exp_normalized;
-
-// 8. overflow/underflow 처리 (exp)
-// E5M3에서 max normal: S.11110.111 --> exp는 최대 30.
+// 6. overflow/underflow 처리
 wire overflow  = (exp_final >  7'sd30);
 wire underflow = (exp_final <= 7'sd0 );
 
-// 9. 출력 값 정의 
+// 7. 출력 값 정의
 wire [8:0] inf_val    = {sign_out, 5'b11111, 3'b000};
 wire [8:0] zero_val   = {sign_out, 5'b00000, 3'b000};
 wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
 
-// 10. 출력
+// 8. 출력
 /*
 always @(*) begin
     if (i_start) begin
