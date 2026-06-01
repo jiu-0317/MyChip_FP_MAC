@@ -33,90 +33,17 @@ module W_I_RF (
 
 // reg [8:0] w_all_set;
 // reg [8:0] i_all_set;
-
-always @(i_clk) begin
-    /*if (!i_rstn) begin
-        w_all_set     <= 9'd0;
-        i_all_set     <= 9'd0;
-    end else */
-    if (i_w_wen) begin
-        case (i_addr)
-            4'b0000: begin 
-                o_w_data  [0] <= i_data;
-                // w_all_set [0] <= 1'd1;
-            end
-            4'b0001: begin
-                o_w_data  [1] <= i_data;
-                // w_all_set [1] <= 1'd1;
-            end
-            4'b0010: begin
-                o_w_data  [2] <= i_data;
-                // w_all_set [2] <= 1'd1;
-            end
-            4'b0011: begin
-                o_w_data  [3] <= i_data;
-                // w_all_set [3] <= 1'd1;
-            end
-            4'b0100: begin
-                o_w_data  [4] <= i_data;
-                // w_all_set [4] <= 1'd1;
-            end
-            4'b0101: begin
-                o_w_data  [5] <= i_data;
-                // w_all_set [5] <= 1'd1;
-            end
-            4'b0110: begin
-                o_w_data  [6] <= i_data;
-                // w_all_set [6] <= 1'd1;
-            end
-            4'b0111: begin
-                o_w_data  [7] <= i_data;
-                // w_all_set [7] <= 1'd1;
-            end
-            4'b1000: begin 
-                o_w_data  [8] <= i_data;
-                // w_all_set [8] <= 1'd1;
-            end
-        endcase
-    end else if (i_i_wen) begin
-        case (i_addr)
-            4'b0000: begin 
-                o_i_data  [0] <= i_data;
-                // i_all_set [0] <= 1'd1;
-            end
-            4'b0001: begin
-                o_i_data  [1] <= i_data;
-                // i_all_set [1] <= 1'd1;
-            end
-            4'b0010: begin
-                o_i_data  [2] <= i_data;
-                // i_all_set [2] <= 1'd1;
-            end
-            4'b0011: begin
-                o_i_data  [3] <= i_data;
-                // i_all_set [3] <= 1'd1;
-            end
-            4'b0100: begin
-                o_i_data  [4] <= i_data;
-                // i_all_set [4] <= 1'd1;
-            end
-            4'b0101: begin
-                o_i_data  [5] <= i_data;
-                // i_all_set [5] <= 1'd1;
-            end
-            4'b0110: begin
-                o_i_data  [6] <= i_data;
-                // i_all_set [6] <= 1'd1;
-            end
-            4'b0111: begin
-                o_i_data  [7] <= i_data;
-                // i_all_set [7] <= 1'd1;
-            end
-            4'b1000: begin 
-                o_i_data  [8] <= i_data;
-                // i_all_set [8] <= 1'd1;
-            end
-        endcase
+always @(posedge i_clk or negedge i_rstn) begin
+    if (!i_rstn) begin
+        for (k = 0; k < 9; k = k + 1) begin
+            o_w_data[k] <= 9'd0;
+            o_i_data[k] <= 9'd0;
+        end
+    end else begin
+        if (i_w_wen && i_addr < 9)
+            o_w_data[i_addr] <= i_data;
+        else if (i_i_wen && i_addr < 9)
+            o_i_data[i_addr] <= i_data;
     end
 end
 
