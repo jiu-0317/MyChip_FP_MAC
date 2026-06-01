@@ -31,7 +31,7 @@ wire [7:0] e5m2;
 // E4M3 변환, underflow는 NaN으로 처리
 always @(*) begin
     if (exp_e4m3<=0) begin
-        e4m3 = {i_data[8], 4'b1111, 3'b111}; // NaN
+        e4m3 = {i_data[8], 4'b0000, 3'b000}; // 극소값 및 0 --> zero saturation
     end else begin
         e4m3 = {i_data[8], exp_e4m3[3:0], i_data[2:0]}; // normal
     end

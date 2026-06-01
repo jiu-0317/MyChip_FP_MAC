@@ -43,7 +43,7 @@ module IR (
   assign exp_e4m3 = i_rx_data[11:8];
 
   // E4M3 exponent bias conversion: bias 7 -> bias 15, add 8
-  assign exp_conv = {1'b0, exp_e4m3} + 5'd8;
+  assign exp_conv = (exp_e4m3 == 4'b0000) ? 5'd0 : ({1'b0, exp_e4m3} + 5'd8);
 
 /* always @(*) begin
     if (!i_rx_done) begin
