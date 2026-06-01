@@ -49,104 +49,33 @@ wire input_is_nan   = (exp_input ==5'b11111) & (mant_input !=3'b000);
 
 
 // 3. Exponent 덧셈
-// 5bit+5bit = 6bit --> signed로 표현 위해 7bit
 wire signed [6:0] exp_added = $signed({2'd0, exp_weight}) + $signed({2'd0, exp_input}) - 7'sd15;
 
-reg [2:0] mant_final;
-reg       exp_adj;
+// 4. Mantissa LUT (곱셈 + 정규화 + 라운딩 + 오버플로우 처리 통합)
+wire [2:0] mant_final;
+wire       exp_delta;
 
-always @(*) begin
-    case ({mant_weight, mant_input})
-        // mant_w=000
-        6'b000_000: {exp_adj, mant_final} = 4'b0_000;
-        6'b000_001: {exp_adj, mant_final} = 4'b0_001;
-        6'b000_010: {exp_adj, mant_final} = 4'b0_010;
-        6'b000_011: {exp_adj, mant_final} = 4'b0_011;
-        6'b000_100: {exp_adj, mant_final} = 4'b0_100;
-        6'b000_101: {exp_adj, mant_final} = 4'b0_101;
-        6'b000_110: {exp_adj, mant_final} = 4'b0_110;
-        6'b000_111: {exp_adj, mant_final} = 4'b0_111;
-        // mant_w=001
-        6'b001_000: {exp_adj, mant_final} = 4'b0_001;
-        6'b001_001: {exp_adj, mant_final} = 4'b0_010;
-        6'b001_010: {exp_adj, mant_final} = 4'b0_011;
-        6'b001_011: {exp_adj, mant_final} = 4'b0_100;
-        6'b001_100: {exp_adj, mant_final} = 4'b0_110;
-        6'b001_101: {exp_adj, mant_final} = 4'b0_111;
-        6'b001_110: {exp_adj, mant_final} = 4'b1_000;
-        6'b001_111: {exp_adj, mant_final} = 4'b1_000;
-        // mant_w=010
-        6'b010_000: {exp_adj, mant_final} = 4'b0_010;
-        6'b010_001: {exp_adj, mant_final} = 4'b0_011;
-        6'b010_010: {exp_adj, mant_final} = 4'b0_100;
-        6'b010_011: {exp_adj, mant_final} = 4'b0_110;
-        6'b010_100: {exp_adj, mant_final} = 4'b0_111;
-        6'b010_101: {exp_adj, mant_final} = 4'b1_000;
-        6'b010_110: {exp_adj, mant_final} = 4'b1_001;
-        6'b010_111: {exp_adj, mant_final} = 4'b1_001;
-        // mant_w=011
-        6'b011_000: {exp_adj, mant_final} = 4'b0_011;
-        6'b011_001: {exp_adj, mant_final} = 4'b0_100;
-        6'b011_010: {exp_adj, mant_final} = 4'b0_110;
-        6'b011_011: {exp_adj, mant_final} = 4'b0_111;
-        6'b011_100: {exp_adj, mant_final} = 4'b1_000;
-        6'b011_101: {exp_adj, mant_final} = 4'b1_001;
-        6'b011_110: {exp_adj, mant_final} = 4'b1_010;
-        6'b011_111: {exp_adj, mant_final} = 4'b1_010;
-        // mant_w=100
-        6'b100_000: {exp_adj, mant_final} = 4'b0_100;
-        6'b100_001: {exp_adj, mant_final} = 4'b0_110;
-        6'b100_010: {exp_adj, mant_final} = 4'b0_111;
-        6'b100_011: {exp_adj, mant_final} = 4'b1_000;
-        6'b100_100: {exp_adj, mant_final} = 4'b1_001;
-        6'b100_101: {exp_adj, mant_final} = 4'b1_010;
-        6'b100_110: {exp_adj, mant_final} = 4'b1_010;
-        6'b100_111: {exp_adj, mant_final} = 4'b1_011;
-        // mant_w=101
-        6'b101_000: {exp_adj, mant_final} = 4'b0_101;
-        6'b101_001: {exp_adj, mant_final} = 4'b0_111;
-        6'b101_010: {exp_adj, mant_final} = 4'b1_000;
-        6'b101_011: {exp_adj, mant_final} = 4'b1_001;
-        6'b101_100: {exp_adj, mant_final} = 4'b1_010;
-        6'b101_101: {exp_adj, mant_final} = 4'b1_011;
-        6'b101_110: {exp_adj, mant_final} = 4'b1_011;
-        6'b101_111: {exp_adj, mant_final} = 4'b1_100;
-        // mant_w=110
-        6'b110_000: {exp_adj, mant_final} = 4'b0_110;
-        6'b110_001: {exp_adj, mant_final} = 4'b1_000;
-        6'b110_010: {exp_adj, mant_final} = 4'b1_001;
-        6'b110_011: {exp_adj, mant_final} = 4'b1_010;
-        6'b110_100: {exp_adj, mant_final} = 4'b1_010;
-        6'b110_101: {exp_adj, mant_final} = 4'b1_011;
-        6'b110_110: {exp_adj, mant_final} = 4'b1_100;
-        6'b110_111: {exp_adj, mant_final} = 4'b1_101;
-        // mant_w=111
-        6'b111_000: {exp_adj, mant_final} = 4'b0_111;
-        6'b111_001: {exp_adj, mant_final} = 4'b1_000;
-        6'b111_010: {exp_adj, mant_final} = 4'b1_001;
-        6'b111_011: {exp_adj, mant_final} = 4'b1_010;
-        6'b111_100: {exp_adj, mant_final} = 4'b1_011;
-        6'b111_101: {exp_adj, mant_final} = 4'b1_100;
-        6'b111_110: {exp_adj, mant_final} = 4'b1_101;
-        6'b111_111: {exp_adj, mant_final} = 4'b1_110;
-        default:    {exp_adj, mant_final} = 4'b0_000;
-    endcase
-end
+mant_mult_lut u_mant_lut (
+    .mant_a     (mant_weight),
+    .mant_b     (mant_input),
+    .mant_final (mant_final),
+    .exp_delta  (exp_delta)
+);
 
-wire signed [6:0] exp_final = exp_added + {6'd0, exp_adj};
+// 5. Exponent 최종 계산
+wire signed [6:0] exp_final = exp_added + (exp_delta ? 7'sd1 : 7'sd0);
 
-// 8. overflow/underflow 처리 (exp)
-// E5M3에서 max normal: S.11110.111 --> exp는 최대 30.
+// 6. overflow/underflow 처리
 wire overflow  = (exp_final >  7'sd30);
 wire underflow = (exp_final <= 7'sd0 );
 
-// 9. 출력 값 정의 
+// 7. 출력 값 정의
 wire [8:0] inf_val    = {sign_out, 5'b11111, 3'b000};
 wire [8:0] zero_val   = {sign_out, 5'b00000, 3'b000};
 wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
 
-// 10. 출력
+// 8. 출력
 /*
 always @(*) begin
     if (i_start) begin
