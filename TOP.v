@@ -50,7 +50,7 @@ wire [8:0]  router_out;
 //wire        fpu_rf_all_valid;
 
 // ACC
-wire [8:0]  acc_result;
+wire [12:0]  acc_result;
 wire        acc_done;
 
 // ACC_R
