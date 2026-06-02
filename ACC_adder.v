@@ -96,7 +96,6 @@ end
 wire overflow  = (exp_norm >= 6'sd31);
 wire underflow = (exp_norm <= 6'sd0);
 
-wire [12:0] inf_val  = {sign_raw, 5'b11111, 7'd0};
 wire [12:0] zero_val = {sign_raw, 5'b00000, 7'd0};
 wire [12:0] nan_val  = 13'b0_11111_0000001;
 wire [12:0] normal_val = {sign_raw, exp_norm[4:0], mant_norm};
@@ -112,7 +111,7 @@ always @(*)begin
     end else if (b_is_zero) begin
         o_result = i_a;
     end else if (overflow) begin
-        o_result = inf_val;
+        o_result = nan_val;
     end else if (underflow) begin
         o_result = zero_val;
     end else begin
