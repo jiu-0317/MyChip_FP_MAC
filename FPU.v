@@ -68,7 +68,6 @@ wire overflow  = (exp_final >  7'sd30);
 wire underflow = (exp_final <= 7'sd0 );
 
 // 7. 출력 값 정의
-wire [8:0] inf_val    = {sign_out, 5'b11111, 3'b000};
 wire [8:0] zero_val   = {sign_out, 5'b00000, 3'b000};
 wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
@@ -94,7 +93,7 @@ always @(*) begin
         end else if (weight_is_zero || input_is_zero) begin
             o_result = zero_val;
         end else if (overflow) begin
-            o_result = inf_val;
+            o_result = nan_val;
         end else if (underflow) begin
             o_result = zero_val;
         end else begin
