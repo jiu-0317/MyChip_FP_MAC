@@ -19,39 +19,36 @@ module ACC (
     input            i_rstn,
     input            i_start,
     input      [8:0] i_data[8:0],
-    output reg [8:0] o_result,
+    output     [12:0] o_result,
     output reg       o_done
 );
 
 // 내부 신호
-reg [3:0] wait_cnt;   // start 후 2사이클 대기용
 reg [3:0] acc_cnt;    // 누적 카운터 (0~8)
 reg       active;     // 누적 진행 중
-reg [8:0] acc_reg;    // 누적값 저장
+reg [12:0] acc_reg;    // 누적값 저장 (E5M7)
 
 // ACC_adder 조합 로직 인스턴스
-wire [8:0] adder_result;
+wire [12:0] adder_result;
 
 ACC_adder u_adder (
     .i_a     (acc_reg),
-    .i_b     (i_data[acc_cnt]),
+    .i_b     ({i_data[acc_cnt], 4'b0000}),
     .o_result(adder_result)
 );
 
+assign o_result = acc_reg;
+
 always @(posedge i_clk or negedge i_rstn) begin
     if (!i_rstn) begin
-        wait_cnt <= 4'd0;
         acc_cnt  <= 4'd0;
         active   <= 1'b0;
-        acc_reg  <= 9'd0;
-        o_result <= 9'd0;
+        acc_reg  <= 13'd0;
         o_done   <= 1'b0;
     end else if (i_start && !active) begin
-        // start 수신: 카운터 초기화, 대기 시작
-        wait_cnt <= 4'd1;
         acc_cnt  <= 4'd0;
         active   <= 1'b1;
-        acc_reg  <= 9'd0;
+        acc_reg  <= 13'd0;
         o_done   <= 1'b0;
     end else if (active) begin
         // 누적 연산
@@ -59,11 +56,9 @@ always @(posedge i_clk or negedge i_rstn) begin
         acc_cnt <= acc_cnt + 4'd1;
 
         if (acc_cnt == 4'd8) begin
-            // 9개 누적 완료
-            o_result <= adder_result;
             o_done   <= 1'b1;
             active   <= 1'b0;
-            end
+        end
     end else begin
         o_done <= 1'b0;
     end
