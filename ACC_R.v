@@ -30,7 +30,9 @@ wire       lsb     = i_mode ? mant[5]            : mant[4];
 
 wire       round_up     = guard & (round_b | sticky | lsb);
 wire [3:0] mant_rounded = {1'b0, trunc} + {3'b0, round_up};
-wire       mant_carry   = mant_rounded[3];
+//  E4M3: 가수 3비트가 [2:0] → 캐리는 [3]
+//  E5M2: 가수 2비트가 [1:0] → 캐리는 [2]
+wire       mant_carry   = i_mode ? mant_rounded[2] : mant_rounded[3];
 
 // =========================================================
 //  E4M3 출력 (bias 15→7)

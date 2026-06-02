@@ -96,7 +96,7 @@ endfunction
 // ================================================================
 //  Test infrastructure
 // ================================================================
-parameter NUM_TESTS = 16;
+parameter NUM_TESTS = 18;
 
 reg        read_mode [0:NUM_TESTS-1];
 reg  [7:0] tw        [0:NUM_TESTS-1][0:8];  // weight values
@@ -104,18 +104,23 @@ reg        twm       [0:NUM_TESTS-1][0:8];  // weight modes
 reg  [7:0] ti        [0:NUM_TESTS-1][0:8];  // input values
 reg        tim       [0:NUM_TESTS-1][0:8];  // input modes
 real       expected  [0:NUM_TESTS-1];
+real       tol_rel   [0:NUM_TESTS-1];       // relative tolerance (0 => absolute 0.001)
 
 integer pass_count, fail_count;
 integer t, j;
+integer seed;
 reg [15:0] result;
-real actual, error_val, w_real, i_real;
+real actual, error_val, w_real, i_real, threshold;
 
 // ================================================================
 //  Test case definitions
 // ================================================================
 task define_tests;
-    integer k;
+    integer k, re, rm;
     begin
+        // default: absolute tolerance (0.001) for all tests
+        for (k=0; k<NUM_TESTS; k=k+1) tol_rel[k] = 0.0;
+
         // ---- Test01: All 1.0 x 1.0 (E4M3), expect=9.0 ----
         read_mode[0] = 0;
         expected[0]  = 9.0;
@@ -216,6 +221,41 @@ task define_tests;
         expected[15]  = 9.0;
         for (k=0; k<9; k=k+1) begin twm[15][k]=0; tw[15][k]=8'h00; tim[15][k]=0; ti[15][k]=8'h00; end
         tw[15][0] = 8'h44; ti[15][0] = 8'h44;
+
+        // ---- Test17: Random SMALL values (E4M3), each entry different ----
+        //   weight/input exp field 4..6 -> magnitude ~0.125..0.94 (all positive)
+        //   output read as E4M3; expected = sum of 9 products (relative tol 15%)
+        seed = 32'hDEAD_BEEF;
+        read_mode[16] = 0;
+        tol_rel[16]   = 0.15;
+        expected[16]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            re = 4 + ({$random(seed)} % 3);          // exp field 4,5,6
+            rm = {$random(seed)} % 8;                // mantissa 0..7
+            twm[16][k] = 0; tw[16][k] = {1'b0, re[3:0], rm[2:0]};
+            re = 4 + ({$random(seed)} % 3);
+            rm = {$random(seed)} % 8;
+            tim[16][k] = 0; ti[16][k] = {1'b0, re[3:0], rm[2:0]};
+            expected[16] = expected[16]
+                         + e4m3_to_real(tw[16][k]) * e4m3_to_real(ti[16][k]);
+        end
+
+        // ---- Test18: Random LARGE values (E4M3 in), each entry different ----
+        //   weight/input exp field 9..11 -> magnitude ~4..30 (all positive)
+        //   sum overflows E4M3 range, so output read as E5M2 (relative tol 30%)
+        read_mode[17] = 1;
+        tol_rel[17]   = 0.30;
+        expected[17]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            re = 9 + ({$random(seed)} % 3);          // exp field 9,10,11
+            rm = {$random(seed)} % 8;
+            twm[17][k] = 0; tw[17][k] = {1'b0, re[3:0], rm[2:0]};
+            re = 9 + ({$random(seed)} % 3);
+            rm = {$random(seed)} % 8;
+            tim[17][k] = 0; ti[17][k] = {1'b0, re[3:0], rm[2:0]};
+            expected[17] = expected[17]
+                         + e4m3_to_real(tw[17][k]) * e4m3_to_real(ti[17][k]);
+        end
     end
 endtask
 
@@ -265,7 +305,15 @@ task run_test;
 
         if (error_val < 0.0) error_val = -error_val;
 
-        if (error_val < 0.001) begin
+        // relative tolerance for quantized (random) cases, else absolute 0.001
+        if (tol_rel[idx] > 0.0) begin
+            threshold = tol_rel[idx] * (expected[idx] < 0.0 ? -expected[idx] : expected[idx]);
+            if (threshold < 0.001) threshold = 0.001;
+        end else begin
+            threshold = 0.001;
+        end
+
+        if (error_val < threshold) begin
             $display("[PASS] Test%02d | Expected=%f  Actual=%f  Error=%f",
                      idx+1, expected[idx], actual, actual - expected[idx]);
             pass_count = pass_count + 1;
