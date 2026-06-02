@@ -36,15 +36,13 @@ wire [2:0] mant_input   = i_input  [2:0];
 //wire is_nan_or_inf = (&exp_weight) | (&exp_input);
 //wire is_zero = (~|exp_weight) & (~|mant_weight) | (~|exp_input) & (~|mant_input);
 
-// inf
-wire weight_is_inf  = (exp_weight==5'b11111) & (mant_weight==3'b000);
-wire input_is_inf   = (exp_input ==5'b11111) & (mant_input ==3'b000);
+
 //zero
 wire weight_is_zero = (exp_weight==5'b00000) & (mant_weight==3'b000);
 wire input_is_zero  = (exp_input ==5'b00000) & (mant_input ==3'b000);
-//nan
-wire weight_is_nan  = (exp_weight==5'b11111) & (mant_weight!=3'b000);
-wire input_is_nan   = (exp_input ==5'b11111) & (mant_input !=3'b000);
+//nan or inf
+wire weight_is_nan_or_inf  = (exp_weight==5'b11111);
+wire input_is_nan_or_inf   = (exp_input ==5'b11111);
 
 
 
@@ -91,12 +89,8 @@ always @(*) begin
 end */
 
 always @(*) begin
-        if (weight_is_nan || input_is_nan) begin
+        if (weight_is_nan_or_inf || input_is_nan_or_inf) begin
             o_result = nan_val;
-        end else if ((weight_is_inf && input_is_zero) || (weight_is_zero && input_is_inf)) begin
-            o_result = nan_val;
-        end else if (weight_is_inf || input_is_inf) begin
-            o_result = inf_val;
         end else if (weight_is_zero || input_is_zero) begin
             o_result = zero_val;
         end else if (overflow) begin
