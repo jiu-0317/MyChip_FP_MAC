@@ -14,7 +14,6 @@ wire [6:0] mant    = i_data[6:0];
 
 // 특수값 감지
 wire is_nan  = (exp_raw == 5'b11111) & (mant != 7'd0);
-wire is_inf  = (exp_raw == 5'b11111) & (mant == 7'd0);
 wire is_zero = (exp_raw == 5'b00000) & (mant == 7'd0);
 
 // =========================================================
@@ -45,7 +44,7 @@ reg [7:0] e4m3;
 always @(*) begin
     if (is_nan)
         e4m3 = {sign, 4'b1111, 3'b111};
-    else if (is_inf || e4m3_exp > 7'sd15)
+    else if (e4m3_exp > 7'sd15)
         e4m3 = {sign, 4'b1111, 3'b110};
     else if (is_zero || e4m3_exp <= 7'sd0)
         e4m3 = {sign, 4'b0000, 3'b000};
@@ -62,7 +61,7 @@ reg [7:0] e5m2;
 always @(*) begin
     if (is_nan)
         e5m2 = {sign, 5'b11111, 2'b01};
-    else if (is_inf || e5m2_exp >= 6'd31)
+    else if (e5m2_exp >= 6'd31)
         e5m2 = {sign, 5'b11111, 2'b00};
     else if (is_zero)
         e5m2 = {sign, 5'b00000, 2'b00};

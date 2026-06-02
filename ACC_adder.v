@@ -24,10 +24,8 @@ wire [4:0] exp_b = i_b [11:7];
 wire [6:0] mant_a = i_a [6:0];
 wire [6:0] mant_b = i_b [6:0];
 
-wire a_is_nan  = (exp_a == 5'b11111) & (mant_a != 7'd0);
-wire b_is_nan  = (exp_b == 5'b11111) & (mant_b != 7'd0);
-wire a_is_inf  = (exp_a == 5'b11111) & (mant_a == 7'd0);
-wire b_is_inf  = (exp_b == 5'b11111) & (mant_b == 7'd0);
+wire a_is_nan_or_inf  = (exp_a == 5'b11111);
+wire b_is_nan_or_inf  = (exp_b == 5'b11111);
 wire a_is_zero = (exp_a == 5'b00000) & (mant_a == 7'd0);
 wire b_is_zero = (exp_b == 5'b00000) & (mant_b == 7'd0);
 
@@ -98,21 +96,14 @@ end
 wire overflow  = (exp_norm >= 6'sd31);
 wire underflow = (exp_norm <= 6'sd0);
 
-wire [12:0] inf_val  = {sign_raw, 5'b11111, 7'd0};
 wire [12:0] zero_val = {sign_raw, 5'b00000, 7'd0};
 wire [12:0] nan_val  = 13'b0_11111_0000001;
 wire [12:0] normal_val = {sign_raw, exp_norm[4:0], mant_norm};
 
 // 6) 결과 출력
 always @(*)begin
-    if (a_is_nan || b_is_nan) begin
+    if (a_is_nan_or_inf || b_is_nan_or_inf) begin
         o_result = nan_val;
-    end else if (a_is_inf && b_is_inf && (sign_a != sign_b)) begin
-        o_result = nan_val;
-    end else if (a_is_inf) begin
-        o_result = {sign_a, 5'b11111, 7'd0};
-    end else if (b_is_inf) begin
-        o_result = {sign_b, 5'b11111, 7'd0};
     end else if (a_is_zero && b_is_zero) begin
         o_result = 13'd0;
     end else if (a_is_zero) begin
@@ -120,7 +111,7 @@ always @(*)begin
     end else if (b_is_zero) begin
         o_result = i_a;
     end else if (overflow) begin
-        o_result = inf_val;
+        o_result = nan_val;
     end else if (underflow) begin
         o_result = zero_val;
     end else begin
