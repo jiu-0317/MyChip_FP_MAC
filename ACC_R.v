@@ -62,7 +62,7 @@ always @(*) begin
     if (is_nan)
         e5m2 = {sign, 5'b11111, 2'b01};
     else if (e5m2_exp >= 6'd31)
-        e5m2 = {sign, 5'b11111, 2'b00};
+        e5m2 = {sign, 5'b11110, 2'b11};
     else if (is_zero)
         e5m2 = {sign, 5'b00000, 2'b00};
     else
