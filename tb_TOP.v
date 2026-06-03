@@ -96,7 +96,7 @@ endfunction
 // ================================================================
 //  Test infrastructure
 // ================================================================
-parameter NUM_TESTS = 18;
+parameter NUM_TESTS = 23;
 
 reg        read_mode [0:NUM_TESTS-1];
 reg  [7:0] tw        [0:NUM_TESTS-1][0:8];  // weight values
@@ -105,6 +105,8 @@ reg  [7:0] ti        [0:NUM_TESTS-1][0:8];  // input values
 reg        tim       [0:NUM_TESTS-1][0:8];  // input modes
 real       expected  [0:NUM_TESTS-1];
 real       tol_rel   [0:NUM_TESTS-1];       // relative tolerance (0 => absolute 0.001)
+reg        expect_special [0:NUM_TESTS-1];  // 1 => compare raw output byte (NaN/Inf 등 실수비교 불가)
+reg  [7:0] expected_byte  [0:NUM_TESTS-1];  // 기대 8bit 출력 인코딩 (special 케이스 전용)
 
 integer pass_count, fail_count;
 integer t, j;
@@ -120,6 +122,12 @@ task define_tests;
     begin
         // default: absolute tolerance (0.001) for all tests
         for (k=0; k<NUM_TESTS; k=k+1) tol_rel[k] = 0.0;
+
+        // default: 일반(실수) 비교. special 케이스만 아래에서 1로 set
+        for (k=0; k<NUM_TESTS; k=k+1) begin
+            expect_special[k] = 1'b0;
+            expected_byte[k]  = 8'h00;
+        end
 
         // ---- Test01: All 1.0 x 1.0 (E4M3), expect=9.0 ----
         read_mode[0] = 0;
@@ -142,9 +150,10 @@ task define_tests;
         expected[3]  = -9.0;
         for (k=0; k<9; k=k+1) begin twm[3][k]=0; tw[3][k]=8'h38; tim[3][k]=0; ti[3][k]=8'hB8; end
 
-        // ---- Test05: All 1.0 x 1.0 (E5M2), expect=9.0 ----
+        // ---- Test05: All 1.0 x 1.0 (E5M2), sum=9.0 ----
+        //   read=E5M2(가수 2bit): 9.0 표현불가 → round-to-even 으로 8.0 으로 양자화
         read_mode[4] = 1;
-        expected[4]  = 9.0;
+        expected[4]  = 8.0;
         for (k=0; k<9; k=k+1) begin twm[4][k]=1; tw[4][k]=8'h3C; tim[4][k]=1; ti[4][k]=8'h3C; end
 
         // ---- Test06: All 0.5 x 0.5 (E4M3), expect=2.25 ----
@@ -196,14 +205,16 @@ task define_tests;
         twm[10][7]=1; tw[10][7]=8'h42; tim[10][7]=0; ti[10][7]=8'h44;
         twm[10][8]=0; tw[10][8]=8'h40; tim[10][8]=1; ti[10][8]=8'h3E;
 
-        // ---- Test12: All 1.5 x 1.5 (E4M3), expect=20.25 ----
+        // ---- Test12: All 1.5 x 1.5 (E4M3), sum=20.25 ----
+        //   read=E4M3(가수 3bit): 20.25 표현불가 → 최근접 20.0 으로 양자화
         read_mode[11] = 0;
-        expected[11]  = 20.25;
+        expected[11]  = 20.0;
         for (k=0; k<9; k=k+1) begin twm[11][k]=0; tw[11][k]=8'h3C; tim[11][k]=0; ti[11][k]=8'h3C; end
 
-        // ---- Test13: All 4.0 x 3.0 (E4M3), expect=108.0 ----
+        // ---- Test13: All 4.0 x 3.0 (E4M3), sum=108.0 ----
+        //   read=E4M3(가수 3bit): 108 표현불가 → 최근접 112.0 으로 양자화
         read_mode[12] = 0;
-        expected[12]  = 108.0;
+        expected[12]  = 112.0;
         for (k=0; k<9; k=k+1) begin twm[12][k]=0; tw[12][k]=8'h48; tim[12][k]=0; ti[12][k]=8'h44; end
 
         // ---- Test14: All 1.0 x 2.0 (E4M3), expect=18.0 ----
@@ -216,9 +227,10 @@ task define_tests;
         expected[14]  = 18.0;
         for (k=0; k<9; k=k+1) begin twm[14][k]=1; tw[14][k]=8'h3C; tim[14][k]=1; ti[14][k]=8'h40; end
 
-        // ---- Test16: Single 3.0 x 3.0 (E4M3), read=E5M2, expect=9.0 ----
+        // ---- Test16: Single 3.0 x 3.0 (E4M3), read=E5M2, sum=9.0 ----
+        //   read=E5M2(가수 2bit): 9.0 표현불가 → round-to-even 으로 8.0 으로 양자화
         read_mode[15] = 1;
-        expected[15]  = 9.0;
+        expected[15]  = 8.0;
         for (k=0; k<9; k=k+1) begin twm[15][k]=0; tw[15][k]=8'h00; tim[15][k]=0; ti[15][k]=8'h00; end
         tw[15][0] = 8'h44; ti[15][0] = 8'h44;
 
@@ -255,6 +267,72 @@ task define_tests;
             tim[17][k] = 0; ti[17][k] = {1'b0, re[3:0], rm[2:0]};
             expected[17] = expected[17]
                          + e4m3_to_real(tw[17][k]) * e4m3_to_real(ti[17][k]);
+        end
+
+        // ================================================================
+        //  특수값(NaN/Inf) 케이스 — 실수 비교 불가 → 출력 raw byte 비교
+        //  특수값은 반드시 E5M2(mode=1) 입력으로 주입해야 E5M3 exp=11111 도달.
+        //  (E4M3 입력은 bias +8 변환상 exp=11111에 도달 불가하여 nan 경로 미도달)
+        //  E5M2 인코딩: +1.0=0x3C, +Inf=0x7C, -Inf=0xFC, NaN=0x7E, 0.0=0x00
+        //  기대 출력: ACC_R nan 인코딩 → E5M2 읽기=0x7D, E4M3 읽기=0x7F
+        // ================================================================
+
+        // ---- Test19: 모든 input = +Inf, weight = +1.0, read E5M2 ----
+        //   FPU는 inf 입력을 nan_val로 매핑 → 최종 NaN(0x7D)
+        read_mode[18]      = 1;
+        expect_special[18] = 1'b1;
+        expected_byte[18]  = 8'h7D;
+        expected[18]       = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[18][k]=1; tw[18][k]=8'h3C;   // +1.0 (E5M2)
+            tim[18][k]=1; ti[18][k]=8'h7C;   // +Inf (E5M2)
+        end
+
+        // ---- Test20: 9개 중 1개 input만 NaN, 나머지 1.0x1.0, read E5M2 ----
+        //   NaN 전파(propagation) 검증 → 최종 NaN(0x7D)
+        read_mode[19]      = 1;
+        expect_special[19] = 1'b1;
+        expected_byte[19]  = 8'h7D;
+        expected[19]       = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[19][k]=1; tw[19][k]=8'h3C;   // +1.0
+            tim[19][k]=1; ti[19][k]=8'h3C;   // +1.0
+        end
+        ti[19][4] = 8'h7E;                   // lane4 input = NaN
+
+        // ---- Test21: 9개 중 1개 weight만 NaN, 나머지 valid, read E4M3 ----
+        //   weight-side 특수값 감지 + E4M3 nan 인코딩(0x7F) 검증
+        read_mode[20]      = 0;
+        expect_special[20] = 1'b1;
+        expected_byte[20]  = 8'h7F;
+        expected[20]       = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[20][k]=1; tw[20][k]=8'h3C;   // +1.0
+            tim[20][k]=1; ti[20][k]=8'h3C;   // +1.0
+        end
+        tw[20][7] = 8'h7E;                   // lane7 weight = NaN
+
+        // ---- Test22: 한 lane에서 Inf x 0, 나머지 valid, read E5M2 ----
+        //   FPU 우선순위(nan_or_inf > zero) 검증: inf*0 → NaN(0x7D)
+        read_mode[21]      = 1;
+        expect_special[21] = 1'b1;
+        expected_byte[21]  = 8'h7D;
+        expected[21]       = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[21][k]=1; tw[21][k]=8'h3C;   // +1.0
+            tim[21][k]=1; ti[21][k]=8'h3C;   // +1.0
+        end
+        tw[21][2]=8'h00; ti[21][2]=8'h7C;    // lane2: weight 0, input +Inf
+
+        // ---- Test23: 모든 input = -Inf, weight = +1.0, read E5M2 ----
+        //   ACC_adder의 nan_val은 sign=0 고정 → 음수 입력이어도 결과 부호는 + (0x7D)
+        read_mode[22]      = 1;
+        expect_special[22] = 1'b1;
+        expected_byte[22]  = 8'h7D;
+        expected[22]       = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[22][k]=1; tw[22][k]=8'h3C;   // +1.0
+            tim[22][k]=1; ti[22][k]=8'hFC;   // -Inf (E5M2)
         end
     end
 endtask
@@ -296,31 +374,44 @@ task run_test;
         spi_transfer(16'h0000, result);
 
         // Evaluate
-        if (read_mode[idx])
-            actual = e5m2_to_real(result[7:0]);
-        else
-            actual = e4m3_to_real(result[7:0]);
-
-        error_val = actual - expected[idx];
-
-        if (error_val < 0.0) error_val = -error_val;
-
-        // relative tolerance for quantized (random) cases, else absolute 0.001
-        if (tol_rel[idx] > 0.0) begin
-            threshold = tol_rel[idx] * (expected[idx] < 0.0 ? -expected[idx] : expected[idx]);
-            if (threshold < 0.001) threshold = 0.001;
+        if (expect_special[idx]) begin
+            // 특수값(NaN/Inf): 실수 비교가 무의미 → 출력 8bit 인코딩을 직접 비교
+            if (result[7:0] === expected_byte[idx]) begin
+                $display("[PASS] Test%02d | (special) Expected=0x%02h  Actual=0x%02h",
+                         idx+1, expected_byte[idx], result[7:0]);
+                pass_count = pass_count + 1;
+            end else begin
+                $display("[FAIL] Test%02d | (special) Expected=0x%02h  Actual=0x%02h",
+                         idx+1, expected_byte[idx], result[7:0]);
+                fail_count = fail_count + 1;
+            end
         end else begin
-            threshold = 0.001;
-        end
+            if (read_mode[idx])
+                actual = e5m2_to_real(result[7:0]);
+            else
+                actual = e4m3_to_real(result[7:0]);
 
-        if (error_val < threshold) begin
-            $display("[PASS] Test%02d | Expected=%f  Actual=%f  Error=%f",
-                     idx+1, expected[idx], actual, actual - expected[idx]);
-            pass_count = pass_count + 1;
-        end else begin
-            $display("[FAIL] Test%02d | Expected=%f  Actual=%f  Error=%f",
-                     idx+1, expected[idx], actual, actual - expected[idx]);
-            fail_count = fail_count + 1;
+            error_val = actual - expected[idx];
+
+            if (error_val < 0.0) error_val = -error_val;
+
+            // relative tolerance for quantized (random) cases, else absolute 0.001
+            if (tol_rel[idx] > 0.0) begin
+                threshold = tol_rel[idx] * (expected[idx] < 0.0 ? -expected[idx] : expected[idx]);
+                if (threshold < 0.001) threshold = 0.001;
+            end else begin
+                threshold = 0.001;
+            end
+
+            if (error_val < threshold) begin
+                $display("[PASS] Test%02d | Expected=%f  Actual=%f  Error=%f",
+                         idx+1, expected[idx], actual, actual - expected[idx]);
+                pass_count = pass_count + 1;
+            end else begin
+                $display("[FAIL] Test%02d | Expected=%f  Actual=%f  Error=%f",
+                         idx+1, expected[idx], actual, actual - expected[idx]);
+                fail_count = fail_count + 1;
+            end
         end
     end
 endtask
