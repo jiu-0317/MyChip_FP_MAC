@@ -41,8 +41,9 @@ wire        ctrl_mode;
 wire [8:0]  w_data   [8:0];
 wire [8:0]  i_data_rf [8:0];
 
-// FPU
-wire [8:0]  fpu_result [8:0];
+// FPU (단일 FPU 시분할: acc_cnt로 (w,i) 쌍 선택)
+wire [3:0]  fpu_sel;
+wire [8:0]  fpu_product;
 
 // FPU_RF
 // 변경
@@ -130,18 +131,12 @@ W_I_RF u_w_i_rf (
     .o_i_data     (i_data_rf)
 );
 
-// ===== FPU x9 =====
-genvar g;
-generate
-    for (g = 0; g < 9; g = g + 1) begin : fpu_gen
-        FPU u_fpu (
-            //.i_start  (ctrl_fpu_start),
-            .i_weight (w_data[g]),
-            .i_input  (i_data_rf[g]),
-            .o_result (fpu_result[g])
-        );
-    end
-endgenerate
+// ACC의 acc_cnt(=fpu_sel)로 매 누산 사이클마다 (w[k], i[k]) 한 쌍을 선택해 곱셈.
+FPU u_fpu (
+    .i_weight (w_data   [fpu_sel]),
+    .i_input  (i_data_rf[fpu_sel]),
+    .o_result (fpu_product)
+);
 
 // ===== FPU_RF =====
 /*FPU_RF u_fpu_rf (
@@ -160,7 +155,8 @@ ACC u_acc (
     .i_clk    (i_clk),
     .i_rstn   (i_rstn),
     .i_start  (ctrl_acc_start),
-    .i_data   (fpu_result),
+    .i_data   (fpu_product),
+    .o_sel    (fpu_sel),
     .o_result (acc_result),
     .o_done   (acc_done)
 );

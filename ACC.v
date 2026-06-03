@@ -18,7 +18,8 @@ module ACC (
     input            i_clk,
     input            i_rstn,
     input            i_start,
-    input      [8:0] i_data[8:0],
+    input      [8:0] i_data,        // 단일 FPU 곱셈 결과 (acc_cnt 인덱스에 해당)
+    output     [3:0] o_sel,         // 곱셈할 (w,i) 쌍 선택 인덱스 = acc_cnt
     output     [12:0] o_result,
     output reg       o_done
 );
@@ -33,10 +34,11 @@ wire [12:0] adder_result;
 
 ACC_adder u_adder (
     .i_a     (acc_reg),
-    .i_b     ({i_data[acc_cnt], 4'b0000}),
+    .i_b     ({i_data, 4'b0000}),
     .o_result(adder_result)
 );
 
+assign o_sel    = acc_cnt;
 assign o_result = acc_reg;
 
 always @(posedge i_clk or negedge i_rstn) begin
