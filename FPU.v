@@ -29,13 +29,6 @@ wire [2:0] mant_weight  = i_weight [2:0];
 wire [2:0] mant_input   = i_input  [2:0];
 
 // 2. 특수값 사전 감지
-// &exp_weight — exponent 전체가 1이면 true (inf 또는 nan)
-// ~|exp_weight — exponent 전체가 0이면 true (zero 또는 subnormal)
-// 양쪽 입력 중 하나라도 해당되면 특수값
-
-//wire is_nan_or_inf = (&exp_weight) | (&exp_input);
-//wire is_zero = (~|exp_weight) & (~|mant_weight) | (~|exp_input) & (~|mant_input);
-
 
 //zero
 wire weight_is_zero = (exp_weight==5'b00000) & (mant_weight==3'b000);
@@ -68,24 +61,12 @@ wire overflow  = (exp_final >  7'sd30);
 wire underflow = (exp_final <= 7'sd0 );
 
 // 7. 출력 값 정의
+wire [8:0] max_val    = {sign_out, 5'b11110, 3'b111};
 wire [8:0] zero_val   = {sign_out, 5'b00000, 3'b000};
 wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
 
 // 8. 출력
-/*
-always @(*) begin
-    if (i_start) begin
-        if (is_nan_or_inf || overflow)
-            o_result = nan_val;
-        else if (is_zero || underflow)
-            o_result = zero_val;
-        else
-            o_result = normal_val;
-    end else begin
-        o_result = 9'd0;
-    end
-end */
 
 always @(*) begin
         if (weight_is_nan_or_inf || input_is_nan_or_inf) begin
@@ -93,7 +74,7 @@ always @(*) begin
         end else if (weight_is_zero || input_is_zero) begin
             o_result = zero_val;
         end else if (overflow) begin
-            o_result = nan_val;
+            o_result = max_val;
         end else if (underflow) begin
             o_result = zero_val;
         end else begin
