@@ -36,13 +36,13 @@ module mant_mult_lut (
             6'b101_000: {exp_delta, mant_final} = 4'b0_101;  // 13*8 =104
             6'b101_001: {exp_delta, mant_final} = 4'b0_111;  // 13*9 =117
             6'b101_010: {exp_delta, mant_final} = 4'b1_000;  // 13*10=130
-            6'b101_011: {exp_delta, mant_final} = 4'b1_010;  // 13*11=143
+            6'b101_011: {exp_delta, mant_final} = 4'b1_001;  // 13*11=143
             6'b101_100: {exp_delta, mant_final} = 4'b1_010;  // 13*12=156
             6'b101_101: {exp_delta, mant_final} = 4'b1_011;  // 13*13=169
             // hi=110
             6'b110_000: {exp_delta, mant_final} = 4'b0_110;  // 14*8 =112
             6'b110_001: {exp_delta, mant_final} = 4'b1_000;  // 14*9 =126
-            6'b110_010: {exp_delta, mant_final} = 4'b1_010;  // 14*10=140
+            6'b110_010: {exp_delta, mant_final} = 4'b1_001;  // 14*10=140
             6'b110_011: {exp_delta, mant_final} = 4'b1_010;  // 14*11=154
             6'b110_100: {exp_delta, mant_final} = 4'b1_010;  // 14*12=168
             6'b110_101: {exp_delta, mant_final} = 4'b1_011;  // 14*13=182
