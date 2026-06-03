@@ -41,8 +41,10 @@ wire        ctrl_mode;
 wire [8:0]  w_data   [8:0];
 wire [8:0]  i_data_rf [8:0];
 
-// FPU
-wire [8:0]  fpu_result [8:0];
+// FPU (3개 병렬, ACC가 acc_cnt로 1개 결과만 선택해 순차 누산)
+wire [3:0]  fpu_sel;
+wire [8:0]  fpu_prod0, fpu_prod1, fpu_prod2;
+wire [8:0]  fpu_product;
 
 // FPU_RF
 // 변경
@@ -130,18 +132,49 @@ W_I_RF u_w_i_rf (
     .o_i_data     (i_data_rf)
 );
 
-// ===== FPU x9 =====
-genvar g;
-generate
-    for (g = 0; g < 9; g = g + 1) begin : fpu_gen
-        FPU u_fpu (
-            //.i_start  (ctrl_fpu_start),
-            .i_weight (w_data[g]),
-            .i_input  (i_data_rf[g]),
-            .o_result (fpu_result[g])
-        );
-    end
-endgenerate
+// ===== FPU x3 (병렬) =====
+// 9개 원소를 3개 그룹으로 나눠 FPU 3개가 담당 (병렬 인스턴스, 항상 동작):
+//   FPU0={0,1,2}, FPU1={3,4,5}, FPU2={6,7,8}
+// 매 사이클 FPU 3개가 모두 곱하지만, ACC는 grp_sel에 해당하는 1개 결과만 선택해
+// 1개 adder로 9사이클 순차 누산 → 결과는 9-FPU와 bit-identical.
+//
+// ----- 고정 스케줄 상수 (cnt가 즉석 선택하지 않고, 순서를 미리 박아둠) -----
+// step(=fpu_sel) 0~8 동안의 처리 순서를 상수 테이블로 고정. cnt는 인덱스 역할만.
+//   step :  0  1  2  3  4  5  6  7  8
+//   누산 원소: 0  1  2  3  4  5  6  7  8   (고정 순서)
+//   grp  :  0  0  0  1  1  1  2  2  2   ← 어느 FPU 출력을 쓸지
+//   sub  :  0  1  2  0  1  2  0  1  2   ← 그룹 내 위치
+// 2bit씩 9 step을 한 벡터에 pack (LSB = step0).
+localparam [17:0] GRP_SCHED = {2'd2,2'd2,2'd2, 2'd1,2'd1,2'd1, 2'd0,2'd0,2'd0};
+localparam [17:0] SUB_SCHED = {2'd2,2'd1,2'd0, 2'd2,2'd1,2'd0, 2'd2,2'd1,2'd0};
+
+wire [1:0] grp_sel = GRP_SCHED[fpu_sel*2 +: 2];  // step별 사용할 FPU 번호
+wire [1:0] sub_idx = SUB_SCHED[fpu_sel*2 +: 2];  // step별 그룹 내 인덱스
+
+// 각 FPU는 자기 그룹 내에서 sub_idx로 (w,i) 한 쌍 선택 (3:1 input mux)
+wire [3:0] idx0 = {2'b00, sub_idx};          // 0,1,2
+wire [3:0] idx1 = {2'b00, sub_idx} + 4'd3;   // 3,4,5
+wire [3:0] idx2 = {2'b00, sub_idx} + 4'd6;   // 6,7,8
+
+FPU u_fpu0 (
+    .i_weight (w_data   [idx0]),
+    .i_input  (i_data_rf[idx0]),
+    .o_result (fpu_prod0)
+);
+FPU u_fpu1 (
+    .i_weight (w_data   [idx1]),
+    .i_input  (i_data_rf[idx1]),
+    .o_result (fpu_prod1)
+);
+FPU u_fpu2 (
+    .i_weight (w_data   [idx2]),
+    .i_input  (i_data_rf[idx2]),
+    .o_result (fpu_prod2)
+);
+
+// group으로 1개 FPU 결과 선택 (3:1 output mux) → ACC로
+assign fpu_product = (grp_sel == 2'd0) ? fpu_prod0 :
+                     (grp_sel == 2'd1) ? fpu_prod1 : fpu_prod2;
 
 // ===== FPU_RF =====
 /*FPU_RF u_fpu_rf (
@@ -160,7 +193,8 @@ ACC u_acc (
     .i_clk    (i_clk),
     .i_rstn   (i_rstn),
     .i_start  (ctrl_acc_start),
-    .i_data   (fpu_result),
+    .i_data   (fpu_product),
+    .o_sel    (fpu_sel),
     .o_result (acc_result),
     .o_done   (acc_done)
 );
