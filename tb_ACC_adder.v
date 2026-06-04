@@ -154,8 +154,10 @@ initial begin
     check_exact(13'h0F80, 13'h0780, 13'h0F81, "Inf + 1.0 = NaN");   // Inf도 nan_val로
     check_exact(13'h1F80, 13'h0780, 13'h0F81, "-Inf + 1.0 = NaN");  // sign 정규화(+)
 
-    // ---- overflow : exp_norm >= 31 → nan ----
-    check_exact(13'h0F00, 13'h0F00, 13'h0F81, "2^15 + 2^15 -> NaN");// exp 30+1=31 overflow
+    // ---- overflow : exp_norm >= 31 → saturate(max_val), NaN 아님 ----
+    //  2^15 + 2^15 = 2^16 -> exp 30+1=31 overflow -> ±max 로 포화
+    check_exact(13'h0F00, 13'h0F00, 13'h0F7F, "2^15+2^15 ->+max");  // +max = 0_11110_1111111
+    check_exact(13'h1F00, 13'h1F00, 13'h1F7F, "-2^15-2^15 ->-max"); // 음수 overflow -> -max
 
     $display("-- Random (real reference, 5000 vectors) ---------------------");
     for (i = 0; i < 5000; i = i + 1)
