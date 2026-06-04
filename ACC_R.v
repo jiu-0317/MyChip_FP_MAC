@@ -1,55 +1,84 @@
-/*
-ACC에서 받아온 E5M3를 mode에 맞게 E4M3 / E5M2로 변환한다.
-
-| Port          | Dir | Width | Description        
-| ------------- | --- | ----- | ------------------ 
-| i_clk, i_rstn | in  | 1     |                    
-| i_wen         | in  | 1     | control에서 보낸 wen   
-| i_mode        | in  | 1     | 0: E4M3 | 1: E5M2 
-| i_data        | in  | 9     | ACC 결과             
-| o_data        | out | 8     | 축소된 포맷                         
-*/
-
 module ACC_R(
     input            i_clk,
     input            i_rstn,
     input            i_wen,
-    input            i_mode,
-    input      [8:0] i_data,
+    input            i_mode,       // 0: E4M3 | 1: E5M2
+    input      [12:0] i_data,      // E5M7 (13비트)
     output reg [7:0] o_data
 );
 
-wire [4:0] exp_raw;
-wire signed [4:0] exp_e4m3; // actual exp --> [3:0], signed for underflow
+// E5M7 필드 분리
+wire       sign    = i_data[12];
+wire [4:0] exp_raw = i_data[11:7];
+wire [6:0] mant    = i_data[6:0];
 
-assign exp_raw = i_data[7:3]; // i_data에서 exp 추출
-assign exp_e4m3 = exp_raw - 5'sd8; // bias 수정 (15-->7, -8)
+// 특수값 감지
+wire is_nan  = (exp_raw == 5'b11111) & (mant != 7'd0);
+wire is_zero = (exp_raw == 5'b00000) & (mant == 7'd0);
 
-reg  [7:0] e4m3;
-wire [7:0] e5m2;
+// =========================================================
+//  공유 라운딩 회로 (mode에 따라 입력 비트 선택)
+// =========================================================
+//  E4M3(mode=0): keep [6:4], guard [3], round [2], sticky |[1:0], lsb [4]
+//  E5M2(mode=1): keep [6:5], guard [4], round [3], sticky |[2:0], lsb [5]
+wire [2:0] trunc   = i_mode ? {1'b0, mant[6:5]} : mant[6:4];
+wire       guard   = i_mode ? mant[4]            : mant[3];
+wire       round_b = i_mode ? mant[3]            : mant[2];
+wire       sticky  = i_mode ? |mant[2:0]         : |mant[1:0];
+wire       lsb     = i_mode ? mant[5]            : mant[4];
 
-// E4M3 변환, underflow는 NaN으로 처리
+wire       round_up     = guard & (round_b | sticky | lsb);
+wire [3:0] mant_rounded = {1'b0, trunc} + {3'b0, round_up};
+//  E4M3: 가수 3비트가 [2:0] → 캐리는 [3]
+//  E5M2: 가수 2비트가 [1:0] → 캐리는 [2]
+wire       mant_carry   = i_mode ? mant_rounded[2] : mant_rounded[3];
+
+// =========================================================
+//  E4M3 출력 (bias 15→7)
+// =========================================================
+wire signed [6:0] e4m3_exp = $signed({2'b0, exp_raw})
+                            - 7'sd8
+                            + {6'd0, mant_carry};
+
+reg [7:0] e4m3;
 always @(*) begin
-    if (exp_e4m3<=0) begin
-        e4m3 = {i_data[8], 4'b1111, 3'b111}; // NaN
-    end else begin
-        e4m3 = {i_data[8], exp_e4m3[3:0], i_data[2:0]}; // normal
-    end
+    if (is_nan)
+        e4m3 = {sign, 4'b1111, 3'b111};
+    else if (e4m3_exp > 7'sd15)
+        e4m3 = {sign, 4'b1111, 3'b110};
+    else if (is_zero || e4m3_exp <= 7'sd0)
+        e4m3 = {sign, 4'b0000, 3'b000};
+    else
+        e4m3 = {sign, e4m3_exp[3:0], mant_rounded[2:0]};
 end
 
-// E5M2 변환
-assign e5m2 = i_data[8:1]; // mantissa lsb 버림
+// =========================================================
+//  E5M2 출력 (bias 동일)
+// =========================================================
+wire [5:0] e5m2_exp = {1'b0, exp_raw} + {5'd0, mant_carry};
 
+reg [7:0] e5m2;
+always @(*) begin
+    if (is_nan)
+        e5m2 = {sign, 5'b11111, 2'b01};
+    else if (e5m2_exp >= 6'd31)
+        e5m2 = {sign, 5'b11110, 2'b11};
+    else if (is_zero)
+        e5m2 = {sign, 5'b00000, 2'b00};
+    else
+        e5m2 = {sign, e5m2_exp[4:0], mant_rounded[1:0]};
+end
+
+// 출력 레지스터
 always @(posedge i_clk or negedge i_rstn) begin
-    if (!i_rstn) begin
-        o_data  <= 8'd0;
-    end else if (i_wen && (i_mode == 0)) begin // mode : E4M3
-        o_data  <= e4m3;
-    end else if (i_wen && (i_mode == 1)) begin // mode : E5M2
-        o_data  <= e5m2;
-    end else begin 
-        o_data  <= 8'd0;
-    end
+    if (!i_rstn)
+        o_data <= 8'd0;
+    else if (i_wen && (i_mode == 0))
+        o_data <= e4m3;
+    else if (i_wen && (i_mode == 1))
+        o_data <= e5m2;
+    else
+        o_data <= 8'd0;
 end
 
-endmodule 
+endmodule

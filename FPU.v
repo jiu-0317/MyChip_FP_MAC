@@ -29,22 +29,13 @@ wire [2:0] mant_weight  = i_weight [2:0];
 wire [2:0] mant_input   = i_input  [2:0];
 
 // 2. 특수값 사전 감지
-// &exp_weight — exponent 전체가 1이면 true (inf 또는 nan)
-// ~|exp_weight — exponent 전체가 0이면 true (zero 또는 subnormal)
-// 양쪽 입력 중 하나라도 해당되면 특수값
 
-//wire is_nan_or_inf = (&exp_weight) | (&exp_input);
-//wire is_zero = (~|exp_weight) & (~|mant_weight) | (~|exp_input) & (~|mant_input);
-
-// inf
-wire weight_is_inf  = (exp_weight==5'b11111) & (mant_weight==3'b000);
-wire input_is_inf   = (exp_input ==5'b11111) & (mant_input ==3'b000);
 //zero
 wire weight_is_zero = (exp_weight==5'b00000) & (mant_weight==3'b000);
 wire input_is_zero  = (exp_input ==5'b00000) & (mant_input ==3'b000);
-//nan
-wire weight_is_nan  = (exp_weight==5'b11111) & (mant_weight!=3'b000);
-wire input_is_nan   = (exp_input ==5'b11111) & (mant_input !=3'b000);
+//nan or inf
+wire weight_is_nan_or_inf  = (exp_weight==5'b11111);
+wire input_is_nan_or_inf   = (exp_input ==5'b11111);
 
 
 
@@ -88,12 +79,15 @@ wire signed [6:0] exp_final  = round_overflow ? (exp_normalized + 7'sd1) : exp_n
 wire overflow  = (exp_final >  7'sd30);
 wire underflow = (exp_final <= 7'sd0 );
 
+// 7. 출력 값 정의
+wire [8:0] max_val    = {sign_out, 5'b11110, 3'b111};
 // 9. 출력 값 정의 
 wire [8:0] inf_val    = {sign_out, 5'b11111, 3'b000};
 wire [8:0] zero_val   = {sign_out, 5'b00000, 3'b000};
 wire [8:0] nan_val    = {sign_out, 5'b11111, 3'b001};
 wire [8:0] normal_val = {sign_out, exp_final [4:0], mant_final [2:0]};
 
+// 8. 출력
 // 10. 출력
 /*
 always @(*) begin
@@ -110,16 +104,12 @@ always @(*) begin
 end */
 
 always @(*) begin
-        if (weight_is_nan || input_is_nan) begin
+        if (weight_is_nan_or_inf || input_is_nan_or_inf) begin
             o_result = nan_val;
-        end else if ((weight_is_inf && input_is_zero) || (weight_is_zero && input_is_inf)) begin
-            o_result = nan_val;
-        end else if (weight_is_inf || input_is_inf) begin
-            o_result = inf_val;
         end else if (weight_is_zero || input_is_zero) begin
             o_result = zero_val;
         end else if (overflow) begin
-            o_result = inf_val;
+            o_result = max_val;
         end else if (underflow) begin
             o_result = zero_val;
         end else begin
