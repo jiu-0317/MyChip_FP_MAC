@@ -487,6 +487,9 @@ initial begin
             expected = expected + prod;
             scale    = scale + (prod < 0.0 ? -prod : prod);
         end
+        // ReLU 반영: 설계가 출력단에서 음수(비-NaN)를 0으로 클램프하므로
+        // 정상 케이스 골든값도 음수면 0으로 만든다. (scale 은 임계값용이라 유지)
+        if (expected < 0.0) expected = 0.0;
 
         // ---- DUT 실행 ----
         run_dut;

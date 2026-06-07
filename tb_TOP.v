@@ -145,9 +145,9 @@ task define_tests;
         expected[2]  = 36.0;
         for (k=0; k<9; k=k+1) begin twm[2][k]=0; tw[2][k]=8'h40; tim[2][k]=0; ti[2][k]=8'h40; end
 
-        // ---- Test04: All 1.0 x (-1.0) (E4M3), expect=-9.0 ----
+        // ---- Test04: All 1.0 x (-1.0) (E4M3), sum=-9.0 -> ReLU -> 0.0 ----
         read_mode[3] = 0;
-        expected[3]  = -9.0;
+        expected[3]  = 0.0;
         for (k=0; k<9; k=k+1) begin twm[3][k]=0; tw[3][k]=8'h38; tim[3][k]=0; ti[3][k]=8'hB8; end
 
         // ---- Test05: All 1.0 x 1.0 (E5M2), sum=9.0 ----
