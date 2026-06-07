@@ -96,7 +96,7 @@ endfunction
 // ================================================================
 //  Test infrastructure
 // ================================================================
-parameter NUM_TESTS = 23;
+parameter NUM_TESTS = 29;
 
 reg        read_mode [0:NUM_TESTS-1];
 reg  [7:0] tw        [0:NUM_TESTS-1][0:8];  // weight values
@@ -333,6 +333,73 @@ task define_tests;
         for (k=0; k<9; k=k+1) begin
             twm[22][k]=1; tw[22][k]=8'h3C;   // +1.0
             tim[22][k]=1; ti[22][k]=8'hFC;   // -Inf (E5M2)
+        end
+
+        // ================================================================
+        //  Subnormal(비정규) flush 검증 — IR.v 의 subnormal→0 수정 적용 후 통과
+        //  비정규 입력 = exp 필드 0, mant!=0. 수정 후 IR이 0으로 flush →
+        //  FPU 가 zero 로 인식 → 해당 lane 기여 0.
+        //  · Test24~27 (discriminating): 비정규를 '큰 값'과 곱해 FPU underflow를
+        //    피하므로, 수정 전이면 leading-1 정규수로 잘못 곱해져 nonzero → FAIL,
+        //    수정 후엔 0 → PASS. read 는 E5M2(min normal 2^-14)로 해 작은 오염도 노출.
+        //  · Test28~29 (boundary): exp=1(최소 정규값)이 '과도하게' flush되지 않는지
+        //    확인. 수정 전/후 모두 PASS 여야 정상(잘못 flush하면 0 → FAIL).
+        // ================================================================
+
+        // ---- Test24: E4M3 weight 전부 비정규(0x07) × 256.0, read E5M2, expect 0 ----
+        read_mode[23] = 1;
+        expected[23]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[23][k]=0; tw[23][k]=8'h07;   // E4M3 subnormal (exp=0000, mant=111)
+            tim[23][k]=0; ti[23][k]=8'h78;   // E4M3 256.0 (exp 큰 값 → FPU underflow 회피)
+        end
+
+        // ---- Test25: E5M2 input 전부 비정규(0x03) × 2^14, read E5M2, expect 0 ----
+        read_mode[24] = 1;
+        expected[24]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[24][k]=1; tw[24][k]=8'h74;   // E5M2 2^14 (exp=11101)
+            tim[24][k]=1; ti[24][k]=8'h03;   // E5M2 subnormal (exp=00000, mant=11)
+        end
+
+        // ---- Test26: E4M3 input 전부 비정규(0x07), weight=256.0, read E5M2, expect 0 ----
+        //   input-side 비정규 flush 검증
+        read_mode[25] = 1;
+        expected[25]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[25][k]=0; tw[25][k]=8'h78;   // E4M3 256.0
+            tim[25][k]=0; ti[25][k]=8'h07;   // E4M3 subnormal
+        end
+
+        // ---- Test27: 혼합 - 정규 lane 3개(1.0x1.0)만 기여, 6개는 비정규, read E5M2, expect 3.0 ----
+        //   수정 전: 비정규 6개가 lane당 ~0.875 오염 → ~8.25 → FAIL
+        read_mode[26] = 1;
+        expected[26]  = 3.0;
+        for (k=0; k<3; k=k+1) begin
+            twm[26][k]=1; tw[26][k]=8'h3C;   // +1.0 (E5M2)
+            tim[26][k]=1; ti[26][k]=8'h3C;   // +1.0
+        end
+        for (k=3; k<9; k=k+1) begin
+            twm[26][k]=1; tw[26][k]=8'h74;   // 2^14
+            tim[26][k]=1; ti[26][k]=8'h03;   // E5M2 subnormal → 0
+        end
+
+        // ---- Test28: 경계 - E4M3 최소 정규값(exp=0001) NOT flush, read E4M3, expect 9.0 ----
+        //   weight=2^-6(0x08) × input=64.0(0x68) → 곱=1.0, 합=9.0
+        read_mode[27] = 0;
+        expected[27]  = 9.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[27][k]=0; tw[27][k]=8'h08;   // E4M3 smallest normal 2^-6 (exp=0001)
+            tim[27][k]=0; ti[27][k]=8'h68;   // E4M3 64.0
+        end
+
+        // ---- Test29: 경계 - E5M2 최소 정규값(exp=00001) NOT flush, read E5M2, expect 8.0 ----
+        //   weight=2^-14(0x04) × input=2^14(0x74) → 곱=1.0, 합=9.0 → E5M2 양자화 8.0
+        read_mode[28] = 1;
+        expected[28]  = 8.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[28][k]=1; tw[28][k]=8'h04;   // E5M2 smallest normal 2^-14 (exp=00001)
+            tim[28][k]=1; ti[28][k]=8'h74;   // E5M2 2^14
         end
     end
 endtask
