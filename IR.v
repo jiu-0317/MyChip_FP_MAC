@@ -73,10 +73,16 @@ always @(*) begin
     o_mode                = i_rx_data[0];
     o_addr                = i_rx_data[4:1];
 
-    if (i_rx_data[0] == 0) begin             // E4M3
-        o_data = {i_rx_data[12], exp_conv, i_rx_data[7:5]};
-    end else begin                            // E5M2
-        o_data = {i_rx_data[12:5], 1'b0};
+    if (i_rx_data[0] == 0) begin                 // E4M3 (exp[11:8], mant[7:5])
+        if (i_rx_data[11:8] == 4'b0000)          // exp=0 → zero/subnormal flush
+            o_data = {i_rx_data[12], 8'b0};      // 부호 유지, exp/mant = 0
+        else
+            o_data = {i_rx_data[12], exp_conv, i_rx_data[7:5]};
+    end else begin                               // E5M2 (exp[11:7], mant[6:5])
+        if (i_rx_data[11:7] == 5'b00000)         // exp=0 → zero/subnormal flush
+            o_data = {i_rx_data[12], 8'b0};
+        else
+            o_data = {i_rx_data[12:5], 1'b0};
     end
 end
 

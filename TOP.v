@@ -7,7 +7,9 @@ module TOP (
     input        i_ssn,
     input        i_mosi,
     input        i_sclk,
-    output       o_miso
+    output       o_miso,
+    // DEBUG: 명령 1개 완료 시 high, 새 명령 들어오면 0
+    output       o_cmd_done
 );
 
 // ===== Internal wires =====
@@ -34,6 +36,7 @@ wire        ctrl_fpu_rf_send_start;
 wire        ctrl_acc_start;
 wire        ctrl_acc_r_wen;
 wire        ctrl_mode;
+wire        ctrl_cmd_done;
 
 // W_I_RF
 // wire        w_all_valid;
@@ -114,8 +117,12 @@ CONTROL u_ctrl (
     .o_acc_start          (ctrl_acc_start),
     .i_acc_done           (acc_done),
     .o_acc_r_wen          (ctrl_acc_r_wen),
-    .o_mode               (ctrl_mode)
+    .o_mode               (ctrl_mode),
+    .o_cmd_done           (ctrl_cmd_done)
 );
+
+// ===== DEBUG 핀 외부 출력 =====
+assign o_cmd_done = ctrl_cmd_done;
 
 // ===== W_I_RF =====
 W_I_RF u_w_i_rf (

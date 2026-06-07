@@ -5,15 +5,21 @@ module tb_TOP;
 reg clk, rstn;
 reg ssn, mosi, sclk_reg;
 wire miso;
+wire dbg_cmd_done;          // DEBUG 핀
 
 TOP u_top (
-    .i_clk  (clk),
-    .i_rstn (rstn),
-    .i_ssn  (ssn),
-    .i_mosi (mosi),
-    .i_sclk (sclk_reg),
-    .o_miso (miso)
+    .i_clk      (clk),
+    .i_rstn     (rstn),
+    .i_ssn      (ssn),
+    .i_mosi     (mosi),
+    .i_sclk     (sclk_reg),
+    .o_miso     (miso),
+    .o_cmd_done (dbg_cmd_done)
 );
+
+// DEBUG 핀이 0으로 떨어진 적이 있는지 감시 (새 명령 시 clear 확인용)
+reg saw_low;
+always @(negedge dbg_cmd_done) saw_low = 1'b1;
 
 // System clock: 100MHz (10ns)
 parameter CLK_PERIOD = 10;
@@ -96,7 +102,7 @@ endfunction
 // ================================================================
 //  Test infrastructure
 // ================================================================
-parameter NUM_TESTS = 23;
+parameter NUM_TESTS = 29;
 
 reg        read_mode [0:NUM_TESTS-1];
 reg  [7:0] tw        [0:NUM_TESTS-1][0:8];  // weight values
@@ -145,9 +151,9 @@ task define_tests;
         expected[2]  = 36.0;
         for (k=0; k<9; k=k+1) begin twm[2][k]=0; tw[2][k]=8'h40; tim[2][k]=0; ti[2][k]=8'h40; end
 
-        // ---- Test04: All 1.0 x (-1.0) (E4M3), expect=-9.0 ----
+        // ---- Test04: All 1.0 x (-1.0) (E4M3), sum=-9.0 -> ReLU -> 0.0 ----
         read_mode[3] = 0;
-        expected[3]  = -9.0;
+        expected[3]  = 0.0;
         for (k=0; k<9; k=k+1) begin twm[3][k]=0; tw[3][k]=8'h38; tim[3][k]=0; ti[3][k]=8'hB8; end
 
         // ---- Test05: All 1.0 x 1.0 (E5M2), sum=9.0 ----
@@ -334,6 +340,73 @@ task define_tests;
             twm[22][k]=1; tw[22][k]=8'h3C;   // +1.0
             tim[22][k]=1; ti[22][k]=8'hFC;   // -Inf (E5M2)
         end
+
+        // ================================================================
+        //  Subnormal(비정규) flush 검증 — IR.v 의 subnormal→0 수정 적용 후 통과
+        //  비정규 입력 = exp 필드 0, mant!=0. 수정 후 IR이 0으로 flush →
+        //  FPU 가 zero 로 인식 → 해당 lane 기여 0.
+        //  · Test24~27 (discriminating): 비정규를 '큰 값'과 곱해 FPU underflow를
+        //    피하므로, 수정 전이면 leading-1 정규수로 잘못 곱해져 nonzero → FAIL,
+        //    수정 후엔 0 → PASS. read 는 E5M2(min normal 2^-14)로 해 작은 오염도 노출.
+        //  · Test28~29 (boundary): exp=1(최소 정규값)이 '과도하게' flush되지 않는지
+        //    확인. 수정 전/후 모두 PASS 여야 정상(잘못 flush하면 0 → FAIL).
+        // ================================================================
+
+        // ---- Test24: E4M3 weight 전부 비정규(0x07) × 256.0, read E5M2, expect 0 ----
+        read_mode[23] = 1;
+        expected[23]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[23][k]=0; tw[23][k]=8'h07;   // E4M3 subnormal (exp=0000, mant=111)
+            tim[23][k]=0; ti[23][k]=8'h78;   // E4M3 256.0 (exp 큰 값 → FPU underflow 회피)
+        end
+
+        // ---- Test25: E5M2 input 전부 비정규(0x03) × 2^14, read E5M2, expect 0 ----
+        read_mode[24] = 1;
+        expected[24]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[24][k]=1; tw[24][k]=8'h74;   // E5M2 2^14 (exp=11101)
+            tim[24][k]=1; ti[24][k]=8'h03;   // E5M2 subnormal (exp=00000, mant=11)
+        end
+
+        // ---- Test26: E4M3 input 전부 비정규(0x07), weight=256.0, read E5M2, expect 0 ----
+        //   input-side 비정규 flush 검증
+        read_mode[25] = 1;
+        expected[25]  = 0.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[25][k]=0; tw[25][k]=8'h78;   // E4M3 256.0
+            tim[25][k]=0; ti[25][k]=8'h07;   // E4M3 subnormal
+        end
+
+        // ---- Test27: 혼합 - 정규 lane 3개(1.0x1.0)만 기여, 6개는 비정규, read E5M2, expect 3.0 ----
+        //   수정 전: 비정규 6개가 lane당 ~0.875 오염 → ~8.25 → FAIL
+        read_mode[26] = 1;
+        expected[26]  = 3.0;
+        for (k=0; k<3; k=k+1) begin
+            twm[26][k]=1; tw[26][k]=8'h3C;   // +1.0 (E5M2)
+            tim[26][k]=1; ti[26][k]=8'h3C;   // +1.0
+        end
+        for (k=3; k<9; k=k+1) begin
+            twm[26][k]=1; tw[26][k]=8'h74;   // 2^14
+            tim[26][k]=1; ti[26][k]=8'h03;   // E5M2 subnormal → 0
+        end
+
+        // ---- Test28: 경계 - E4M3 최소 정규값(exp=0001) NOT flush, read E4M3, expect 9.0 ----
+        //   weight=2^-6(0x08) × input=64.0(0x68) → 곱=1.0, 합=9.0
+        read_mode[27] = 0;
+        expected[27]  = 9.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[27][k]=0; tw[27][k]=8'h08;   // E4M3 smallest normal 2^-6 (exp=0001)
+            tim[27][k]=0; ti[27][k]=8'h68;   // E4M3 64.0
+        end
+
+        // ---- Test29: 경계 - E5M2 최소 정규값(exp=00001) NOT flush, read E5M2, expect 8.0 ----
+        //   weight=2^-14(0x04) × input=2^14(0x74) → 곱=1.0, 합=9.0 → E5M2 양자화 8.0
+        read_mode[28] = 1;
+        expected[28]  = 8.0;
+        for (k=0; k<9; k=k+1) begin
+            twm[28][k]=1; tw[28][k]=8'h04;   // E5M2 smallest normal 2^-14 (exp=00001)
+            tim[28][k]=1; ti[28][k]=8'h74;   // E5M2 2^14
+        end
     end
 endtask
 
@@ -417,6 +490,67 @@ task run_test;
 endtask
 
 // ================================================================
+//  DEBUG 핀(o_cmd_done) 검증
+//   - 새 명령이 들어오면 0으로 clear (negedge 관측 = saw_low)
+//   - 명령이 끝나면 high
+// ================================================================
+task dbg_step;
+    input [2:0]    cmd;
+    input [7:0]    data;
+    input [3:0]    addr;
+    input          mode;
+    input integer  settle;       // 명령 완료까지 기다릴 시간(ns)
+    input          check_clear;  // 1이면 새 명령 시 0으로 clear 됐는지도 확인
+    input [8*16:1] name;
+    begin
+        saw_low = 1'b0;
+        spi_cmd(cmd, data, addr, mode);
+        #(settle);
+        if (dbg_cmd_done === 1'b1 && (check_clear === 1'b0 || saw_low === 1'b1)) begin
+            $display("[PASS] dbg %0s | clear_seen=%b done=%b", name, saw_low, dbg_cmd_done);
+            pass_count = pass_count + 1;
+        end else begin
+            $display("[FAIL] dbg %0s | clear_seen=%b(exp %b) done=%b(exp 1)",
+                     name, saw_low, check_clear, dbg_cmd_done);
+            fail_count = fail_count + 1;
+        end
+    end
+endtask
+
+task dbg_pin_test;
+    begin
+        $display("");
+        $display("================================================================");
+        $display("  DEBUG PIN (o_cmd_done) 검증");
+        $display("================================================================");
+
+        // 리셋
+        rstn = 0; ssn = 1; mosi = 0; sclk_reg = 0;
+        #(CLK_PERIOD * 10);
+        rstn = 1;
+        #(CLK_PERIOD * 10);
+
+        // 리셋 직후 0 확인
+        if (dbg_cmd_done === 1'b0) begin
+            $display("[PASS] dbg RESET | done=0 after reset");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("[FAIL] dbg RESET | done=%b (exp 0)", dbg_cmd_done);
+            fail_count = fail_count + 1;
+        end
+
+        // 첫 명령: 리셋 후 핀이 이미 0이라 clear(negedge) 관측 불가 → done=1만 확인
+        dbg_step(3'b000, 8'h38, 4'd0, 1'b0,  500, 1'b0, "LOAD_W(first)");
+        // 이후: 새 명령 시 0으로 clear 되고 완료 후 다시 1 되는지 모두 확인
+        dbg_step(3'b001, 8'h38, 4'd0, 1'b0,  500, 1'b1, "LOAD_I");
+        dbg_step(3'b010, 8'h00, 4'd0, 1'b0,  500, 1'b1, "COMPUTE");
+        dbg_step(3'b011, 8'h00, 4'd0, 1'b0, 3000, 1'b1, "ACC");
+        // READ_RESULT 는 직전 ACC 로 acc_done_flag 가 set 되어야 동작
+        dbg_step(3'b100, 8'h00, 4'd0, 1'b0,  500, 1'b1, "READ_RESULT");
+    end
+endtask
+
+// ================================================================
 //  Main
 // ================================================================
 initial begin
@@ -436,6 +570,9 @@ initial begin
 
     for (t = 0; t < NUM_TESTS; t = t + 1)
         run_test(t);
+
+    // DEBUG 핀 검증
+    dbg_pin_test;
 
     $display("");
     $display("================================================================");

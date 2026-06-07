@@ -149,19 +149,34 @@ task check_rand;
         // 입력 실수값 (E5M7 정상수)
         xin = (s_raw[0] ? -1.0 : 1.0) * (1.0 + m_raw/128.0) * (2.0 ** (e_raw-15));
 
-        best = best_dist(xin, mode_r[0]);
-        xdut = decode_target(rr, mode_r[0]);
-        ddut = xdut - xin; if (ddut < 0.0) ddut = -ddut;
-
-        // DUT 출력이 '최근접 표현가능값'이면 통과 (tie는 어느쪽이든 허용)
-        if (ddut <= best + best*1.0e-9 + 1.0e-30) begin
-            pass_count = pass_count + 1;
+        if (s_raw[0]) begin
+            // ReLU: 음수(비-NaN) 입력 -> 0x00 기대
+            if (rr === 8'h00) begin
+                pass_count = pass_count + 1;
+            end else begin
+                fail_count = fail_count + 1;
+                if (rand_fail_print < 20) begin
+                    $display("[FAIL rand-relu] in(s1 e%0d m%0d)=%f mode=%0d -> %h (expected 00)",
+                             e_raw, m_raw, xin, mode_r[0], rr);
+                    rand_fail_print = rand_fail_print + 1;
+                end
+            end
         end else begin
-            fail_count = fail_count + 1;
-            if (rand_fail_print < 20) begin
-                $display("[FAIL rand] in(s%0d e%0d m%0d)=%f mode=%0d -> %h(%f) | best=%f ddut=%f",
-                         s_raw[0], e_raw, m_raw, xin, mode_r[0], rr, xdut, best, ddut);
-                rand_fail_print = rand_fail_print + 1;
+            // 양수: 기존 최근접 표현가능값 검증
+            best = best_dist(xin, mode_r[0]);
+            xdut = decode_target(rr, mode_r[0]);
+            ddut = xdut - xin; if (ddut < 0.0) ddut = -ddut;
+
+            // DUT 출력이 '최근접 표현가능값'이면 통과 (tie는 어느쪽이든 허용)
+            if (ddut <= best + best*1.0e-9 + 1.0e-30) begin
+                pass_count = pass_count + 1;
+            end else begin
+                fail_count = fail_count + 1;
+                if (rand_fail_print < 20) begin
+                    $display("[FAIL rand] in(s%0d e%0d m%0d)=%f mode=%0d -> %h(%f) | best=%f ddut=%f",
+                             s_raw[0], e_raw, m_raw, xin, mode_r[0], rr, xdut, best, ddut);
+                    rand_fail_print = rand_fail_print + 1;
+                end
             end
         end
     end
@@ -224,9 +239,9 @@ initial begin
     check_exact(13'h0F80, 1'b0, 8'h7E, "Inf -> E4M3 saturate");
     check_exact(13'h0F80, 1'b1, 8'h7B, "Inf -> E5M2 saturate");
 
-    // ---- 음수 부호 유지 ----
-    check_exact(13'h1840, 1'b0, 8'hC4, "-3.0 -> E4M3");     // sign 유지
-    check_exact(13'h1840, 1'b1, 8'hC2, "-3.0 -> E5M2");
+    // ---- 음수: ReLU 적용 -> 0 (NaN 아닌 음수는 0으로 클램프) ----
+    check_exact(13'h1840, 1'b0, 8'h00, "-3.0 ReLU E4M3");   // 음수 -> 0
+    check_exact(13'h1840, 1'b1, 8'h00, "-3.0 ReLU E5M2");
 
     $display("-- Random (nearest-code reference, 5000 vectors) -------------");
     for (i = 0; i < 5000; i = i + 1)

@@ -23,7 +23,9 @@ module CONTROL (
     input i_acc_done,
     //ACC_R
     output reg o_acc_r_wen,
-    output reg o_mode
+    output reg o_mode,
+    // DEBUG: 명령 1개 완료 시 high, 새 명령 들어오면 0
+    output reg o_cmd_done
 );
 
 localparam S_IDLE          = 3'b000;
@@ -106,6 +108,27 @@ always @(*) begin
         default: next_state = S_IDLE;
     endcase
 end
+
+//--------------------
+// DEBUG 핀: 명령 1개가 끝나면 high, 새 명령 펄스가 오면 0으로 클리어
+//   ACC는 FSM이 바로 IDLE로 돌아오므로 실제 누산 완료(i_acc_done)를 완료로 사용,
+//   나머지 명령은 해당 처리 state를 완료 시점으로 사용.
+wire cmd_done_event = (state == S_LOAD_W)    ||
+                      (state == S_LOAD_I)    ||
+                      (state == S_COMPUTE)   ||
+                      (state == S_TX_RESULT) ||
+                      i_acc_done;
+
+always @(posedge i_clk or negedge i_rstn) begin
+    if (!i_rstn)
+        o_cmd_done <= 1'b0;
+    else if (i_cmd_valid_one_pulse)   // 새 명령 들어오면 0
+        o_cmd_done <= 1'b0;
+    else if (cmd_done_event)          // 명령이 끝나면 high
+        o_cmd_done <= 1'b1;
+end
+
+//--------------------
 
 // --- output logic ---
 always @(posedge i_clk or negedge i_rstn) begin
