@@ -5,15 +5,21 @@ module tb_TOP;
 reg clk, rstn;
 reg ssn, mosi, sclk_reg;
 wire miso;
+wire dbg_cmd_done;          // DEBUG 핀
 
 TOP u_top (
-    .i_clk  (clk),
-    .i_rstn (rstn),
-    .i_ssn  (ssn),
-    .i_mosi (mosi),
-    .i_sclk (sclk_reg),
-    .o_miso (miso)
+    .i_clk      (clk),
+    .i_rstn     (rstn),
+    .i_ssn      (ssn),
+    .i_mosi     (mosi),
+    .i_sclk     (sclk_reg),
+    .o_miso     (miso),
+    .o_cmd_done (dbg_cmd_done)
 );
+
+// DEBUG 핀이 0으로 떨어진 적이 있는지 감시 (새 명령 시 clear 확인용)
+reg saw_low;
+always @(negedge dbg_cmd_done) saw_low = 1'b1;
 
 // System clock: 100MHz (10ns)
 parameter CLK_PERIOD = 10;
@@ -484,6 +490,67 @@ task run_test;
 endtask
 
 // ================================================================
+//  DEBUG 핀(o_cmd_done) 검증
+//   - 새 명령이 들어오면 0으로 clear (negedge 관측 = saw_low)
+//   - 명령이 끝나면 high
+// ================================================================
+task dbg_step;
+    input [2:0]    cmd;
+    input [7:0]    data;
+    input [3:0]    addr;
+    input          mode;
+    input integer  settle;       // 명령 완료까지 기다릴 시간(ns)
+    input          check_clear;  // 1이면 새 명령 시 0으로 clear 됐는지도 확인
+    input [8*16:1] name;
+    begin
+        saw_low = 1'b0;
+        spi_cmd(cmd, data, addr, mode);
+        #(settle);
+        if (dbg_cmd_done === 1'b1 && (check_clear === 1'b0 || saw_low === 1'b1)) begin
+            $display("[PASS] dbg %0s | clear_seen=%b done=%b", name, saw_low, dbg_cmd_done);
+            pass_count = pass_count + 1;
+        end else begin
+            $display("[FAIL] dbg %0s | clear_seen=%b(exp %b) done=%b(exp 1)",
+                     name, saw_low, check_clear, dbg_cmd_done);
+            fail_count = fail_count + 1;
+        end
+    end
+endtask
+
+task dbg_pin_test;
+    begin
+        $display("");
+        $display("================================================================");
+        $display("  DEBUG PIN (o_cmd_done) 검증");
+        $display("================================================================");
+
+        // 리셋
+        rstn = 0; ssn = 1; mosi = 0; sclk_reg = 0;
+        #(CLK_PERIOD * 10);
+        rstn = 1;
+        #(CLK_PERIOD * 10);
+
+        // 리셋 직후 0 확인
+        if (dbg_cmd_done === 1'b0) begin
+            $display("[PASS] dbg RESET | done=0 after reset");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("[FAIL] dbg RESET | done=%b (exp 0)", dbg_cmd_done);
+            fail_count = fail_count + 1;
+        end
+
+        // 첫 명령: 리셋 후 핀이 이미 0이라 clear(negedge) 관측 불가 → done=1만 확인
+        dbg_step(3'b000, 8'h38, 4'd0, 1'b0,  500, 1'b0, "LOAD_W(first)");
+        // 이후: 새 명령 시 0으로 clear 되고 완료 후 다시 1 되는지 모두 확인
+        dbg_step(3'b001, 8'h38, 4'd0, 1'b0,  500, 1'b1, "LOAD_I");
+        dbg_step(3'b010, 8'h00, 4'd0, 1'b0,  500, 1'b1, "COMPUTE");
+        dbg_step(3'b011, 8'h00, 4'd0, 1'b0, 3000, 1'b1, "ACC");
+        // READ_RESULT 는 직전 ACC 로 acc_done_flag 가 set 되어야 동작
+        dbg_step(3'b100, 8'h00, 4'd0, 1'b0,  500, 1'b1, "READ_RESULT");
+    end
+endtask
+
+// ================================================================
 //  Main
 // ================================================================
 initial begin
@@ -503,6 +570,9 @@ initial begin
 
     for (t = 0; t < NUM_TESTS; t = t + 1)
         run_test(t);
+
+    // DEBUG 핀 검증
+    dbg_pin_test;
 
     $display("");
     $display("================================================================");
