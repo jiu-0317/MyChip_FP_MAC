@@ -15,6 +15,7 @@ wire [6:0] mant    = i_data[6:0];
 // 특수값 감지
 wire is_nan  = (exp_raw == 5'b11111) & (mant != 7'd0);
 wire is_zero = (exp_raw == 5'b00000) & (mant == 7'd0);
+wire relu_zero = sign & ~is_nan;
 
 // =========================================================
 //  공유 라운딩 회로 (mode에 따라 입력 비트 선택)
@@ -72,6 +73,8 @@ end
 // 출력 레지스터
 always @(posedge i_clk or negedge i_rstn) begin
     if (!i_rstn)
+        o_data <= 8'd0;
+    else if (i_wen && relu_zero)
         o_data <= 8'd0;
     else if (i_wen && (i_mode == 0))
         o_data <= e4m3;
